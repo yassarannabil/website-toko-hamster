@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Brand Colors — warm, earthy, premium */
+  --color-brand-50: #fef9f3;
+  --color-brand-100: #fdf0e1;
+  --color-brand-200: #faddbe;
+  --color-brand-300: #f5c38f;
+  --color-brand-400: #efa55e;
+  --color-brand-500: #ea8b3a;
+  --color-brand-600: #dc7030;
+  --color-brand-700: #b65628;
+  --color-brand-800: #914527;
+  --color-brand-900: #753b23;
+
+  --color-surface: #fdfcfb;
+  --color-surface-card: #ffffff;
+  --color-surface-muted: #f7f5f2;
+
+  --color-text-primary: #1a1614;
+  --color-text-secondary: #6b5e54;
+  --color-text-muted: #9c8e82;
+
+  --color-wa-green: #25d366;
+  --color-wa-green-hover: #1ebe57;
+  --color-sold-gray: #9ca3af;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+/* Subtle card float animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Skeleton loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
