@@ -19,7 +19,11 @@ class BoxSerializer(serializers.ModelSerializer):
         fields = [
             "box_id",
             "nama_box",
+            "session",
             "kategori",
+            "spesies",
+            "kategori_box",
+            "jenis_kelamin_box",
             "urutan",
             "jumlah_tersedia",
             "jumlah_total",
@@ -87,17 +91,25 @@ class LiveInventorySerializer(serializers.ModelSerializer):
 
     def get_varian(self, obj) -> str:
         """Format: Syrian - Golden Satin LH"""
+        # Khusus Perlengkapan / Aksesoris, tidak perlu embel-embel jenis bulu "Tidak Ada"
+        if obj.variant.spesies == "Perlengkapan":
+            return f"Perlengkapan - {obj.variant.varian_warna}"
+
         parts = [obj.variant.varian_warna]
         if obj.variant.is_satin:
             parts.append("Satin")
         bulu = self.BULU_ABBR.get(obj.variant.jenis_bulu, obj.variant.jenis_bulu)
-        if bulu:
+        if bulu and bulu != "Tidak Ada (Aksesoris)":
             parts.append(bulu)
         return f"{obj.variant.spesies} - {' '.join(parts)}"
 
     def get_foto_preview(self, obj) -> str | None:
         """Return absolute URL for the uploaded photo."""
         if obj.foto_preview:
+            # Jika name sudah berbentuk absolute URL (dari direct upload), gunakan langsung
+            name = str(obj.foto_preview.name)
+            if name.startswith("http"):
+                return name
             request = self.context.get("request")
             if request:
                 return request.build_absolute_uri(obj.foto_preview.url)
@@ -107,6 +119,10 @@ class LiveInventorySerializer(serializers.ModelSerializer):
     def get_video_file(self, obj) -> str | None:
         """Return absolute URL for the uploaded video."""
         if obj.video_file:
+            # Jika name sudah berbentuk absolute URL (dari direct upload), gunakan langsung
+            name = str(obj.video_file.name)
+            if name.startswith("http"):
+                return name
             request = self.context.get("request")
             if request:
                 return request.build_absolute_uri(obj.video_file.url)

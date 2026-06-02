@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 import dj_database_url
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
 
@@ -27,9 +28,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-_7&v!j(qanh_v=6#a(g2(lc^c+olo2in=!h*+57gy-s-i-=%=u")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True").lower() == "true"
+# Karena ini dijalankan lokal di Mac Anda, kita set ke True agar mudah lihat error
+DEBUG = True
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+# Izinkan akses dari Ngrok
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", ".ngrok.app", ".ngrok-free.app", "*"]
+
+# Percayai origin Ngrok untuk form submission (Django Admin)
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app", "https://*.ngrok.app"]
 
 
 # Application definition
@@ -87,18 +93,13 @@ WSGI_APPLICATION = "noska_hamster.wsgi.application"
 
 # PostgreSQL (Production) — ganti kredensial sesuai environment
 # Untuk development tanpa PostgreSQL, gunakan SQLite di bawah.
-if os.environ.get("DATABASE_URL"):
-    DATABASES = {
-        "default": dj_database_url.config(default=os.environ.get("DATABASE_URL"), conn_max_age=600)
+# Kita kembali menggunakan SQLite karena data aman di Mac Anda.
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
-else:
-    # SQLite fallback untuk development lokal
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 
 # Password validation
@@ -137,18 +138,25 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# Enable WhiteNoise compression and caching support
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media files (User-uploaded: foto, video)
+# Disimpan secara lokal di folder media/ (sebagai fallback)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Cloudinary Setup untuk Production
+# File Storage Configuration (Django 4.2+)
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# Cloudinary Setup untuk Auto-Optimization
 if os.environ.get("CLOUDINARY_URL"):
-    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.RawMediaCloudinaryStorage"
-    # Note: Using RawMediaCloudinaryStorage because we upload videos and images.
-    # If only images, MediaCloudinaryStorage would be used. Raw handles everything.
+    STORAGES["default"]["BACKEND"] = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -164,6 +172,15 @@ CORS_ALLOWED_ORIGINS = [
 if os.environ.get("FRONTEND_URL"):
     CORS_ALLOWED_ORIGINS.append(os.environ.get("FRONTEND_URL"))
 
+# ──────────────────────────────────────────────
+# Frontend Public URL (for customer-facing links)
+# ──────────────────────────────────────────────
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://noska-hamster.shop")
+
+# ──────────────────────────────────────────────
+# Komerce (RajaOngkir) Cek Ongkir API
+# ──────────────────────────────────────────────
+KOMERCE_API_KEY = os.environ.get("KOMERCE_API_KEY", "")
 
 # ──────────────────────────────────────────────
 # Django REST Framework
@@ -175,3 +192,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
 }
+
+# Increase upload limits for photos and videos
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+

@@ -22,8 +22,6 @@ const BOX_BORDER = "border-amber-200";
 export default async function KatalogPage() {
   const boxes = await getBoxes();
 
-  const totalAvailable = boxes.reduce((sum, b) => sum + b.jumlah_tersedia, 0);
-
   return (
     <div className="min-h-screen bg-surface flex flex-col">
       {/* ───── Header ───── */}
@@ -77,21 +75,31 @@ export default async function KatalogPage() {
                   {/* Info */}
                   <div>
                     <h2 className="text-lg font-bold text-text-primary">
-                      Box {box.nama_box}
+                      {box.nama_box.toLowerCase() === "aksesoris" || box.spesies === "Perlengkapan" 
+                        ? box.nama_box 
+                        : `Box ${box.nama_box}`}
                     </h2>
-                    {box.kategori && (
-                      <p className="mt-0.5 text-sm text-text-secondary line-clamp-1">
-                        {box.kategori}
+                    
+                    {/* Baris 2: Spesies */}
+                    {box.spesies && (
+                      <p className="mt-1 text-sm font-semibold text-brand-600">
+                        {box.spesies}
                       </p>
                     )}
-                  </div>
-
-                  {/* Count — NO "Terjual" label at this level */}
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      {box.jumlah_tersedia} Tersedia
-                    </span>
+                    
+                    {/* Baris 3: Kategori & Jenis Kelamin (atau Fallback) */}
+                    {(box.kategori_box || box.jenis_kelamin_box) ? (
+                      <p className="mt-0.5 text-sm text-text-secondary leading-snug">
+                        {box.kategori_box === "Mix" && box.jenis_kelamin_box === "Mix"
+                          ? "Mix"
+                          : `${box.kategori_box || ""} ${box.jenis_kelamin_box || ""}`.trim()
+                        }
+                      </p>
+                    ) : box.kategori ? (
+                      <p className="mt-1 text-sm text-text-secondary leading-snug">
+                        {box.kategori}
+                      </p>
+                    ) : null}
                   </div>
 
                   {/* Arrow */}

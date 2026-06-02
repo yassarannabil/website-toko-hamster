@@ -5,10 +5,13 @@ Dashboard data entry lengkap dengan list_display & list_filter yang kaya.
 """
 
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
+from django.urls import path
+from django.shortcuts import render, redirect
+from django.contrib import messages
 from .models import (
     Customer, Address, MasterVariant, SetupSession, Box, LiveInventory,
-    MasterCourier, Order, OrderDetail, Shipment, Ledger,
+    MasterCourier, Transaction
 )
 
 
@@ -22,25 +25,6 @@ class AddressInline(admin.TabularInline):
     fields = ["label_alamat", "nama_penerima", "nomor_wa_penerima",
               "kota_kabupaten", "provinsi", "is_default"]
 
-
-class OrderDetailInline(admin.TabularInline):
-    model = OrderDetail
-    extra = 1
-    fields = ["inventory", "variant", "qty", "harga_satuan_deal", "subtotal", "catatan_khusus"]
-    readonly_fields = ["subtotal"]
-    autocomplete_fields = ["inventory", "variant"]
-
-
-class ShipmentInline(admin.StackedInline):
-    model = Shipment
-    extra = 0
-    fields = [
-        ("courier", "nomor_resi"),
-        ("tanggal_kirim", "estimasi_hari", "tanggal_diterima"),
-        ("status_kirim", "kondisi_hamster"),
-        "catatan_pengiriman",
-    ]
-    autocomplete_fields = ["courier"]
 
 
 class BoxInline(admin.TabularInline):
@@ -187,7 +171,7 @@ class LiveInventoryAdmin(admin.ModelAdmin):
         "box__session",
     ]
     search_fields = ["kode_hamster", "variant__spesies", "variant__varian_warna"]
-    autocomplete_fields = ["variant", "box"]
+    autocomplete_fields = ["variant"]
     list_editable = ["status_ketersediaan"]
     list_per_page = 25
     readonly_fields = ["kode_hamster", "preview_foto"]
@@ -206,8 +190,14 @@ class LiveInventoryAdmin(admin.ModelAdmin):
         }),
     ]
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "box":
+            # Hanya tampilkan Box yang sesinya sedang Aktif
+            kwargs["queryset"] = Box.objects.filter(session__is_active=True).order_by('urutan')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     @admin.display(description="Harga Display")
+
     def harga_display_formatted(self, obj):
         return f"Rp{obj.harga_display:,.0f}"
 
@@ -239,116 +229,128 @@ class MasterCourierAdmin(admin.ModelAdmin):
     search_fields = ["nama_kurir", "jenis_layanan"]
 
 
-@admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
-    list_display = [
-        "nomor_invoice", "customer", "jenis_penjualan",
-        "total_order_formatted", "status_badge", "tanggal_order",
-    ]
-    list_filter = ["jenis_penjualan", "status_order", "tanggal_order"]
-    search_fields = ["nomor_invoice", "customer__nama_customer", "customer__nomor_wa"]
-    autocomplete_fields = ["customer", "address"]
-    readonly_fields = ["nomor_invoice", "tanggal_order", "total_order"]
-    date_hierarchy = "tanggal_order"
-    list_per_page = 25
-    inlines = [OrderDetailInline, ShipmentInline]
+
+
+
+# ══════════════════════════════════════════════
+# Transaction (Auto-Parse)
+# ══════════════════════════════════════════════
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ["transaction_id", "customer_wa", "status_pembayaran", "total_bayar_formatted", "tanggal_kirim", "alamat_status", "created_at", "link_form_alamat"]
+    list_editable = ["tanggal_kirim"]
+    list_filter = ["status_pembayaran", "alamat_lengkap"]
+    search_fields = ["customer__nomor_wa", "raw_rekapan"]
+    readonly_fields = ["transaction_id", "customer", "metode_pembayaran", "total_bayar", "keterangan_kurir", "hamsters", "alamat", "token_alamat", "alamat_lengkap", "created_at"]
+    filter_horizontal = ["hamsters"]
+    
     fieldsets = [
-        ("🧾 Info Order", {
-            "fields": ["nomor_invoice", "customer", "address", "jenis_penjualan"],
+        ("Input Cepat (Paste Rekapan WA)", {
+            "fields": ["raw_rekapan"],
+            "description": "Paste 4 baris rekapan WA di sini. Sistem akan otomatis mengisi data lainnya saat Anda klik Save.",
         }),
-        ("📊 Status & Total", {
-            "fields": ["status_order", "total_order", "catatan_order"],
+        ("Detail Transaksi", {
+            "fields": ["transaction_id", "customer", "status_pembayaran", "nomor_resi", "metode_pembayaran", "total_bayar", "keterangan_kurir", "hamsters"],
+            "classes": ["collapse"],
         }),
+        ("Status Alamat", {
+            "fields": ["alamat_lengkap", "alamat", "token_alamat"],
+        })
     ]
-
+    
+    @admin.display(description="No. WA")
+    def customer_wa(self, obj):
+        return obj.customer.nomor_wa if obj.customer else "-"
+        
     @admin.display(description="Total")
-    def total_order_formatted(self, obj):
-        return f"Rp{obj.total_order:,.0f}"
+    def total_bayar_formatted(self, obj):
+        return f"Rp{obj.total_bayar:,.0f}"
 
-    @admin.display(description="Status")
-    def status_badge(self, obj):
-        colors = {
-            "Pending": "#f59e0b",
-            "Confirmed": "#3b82f6",
-            "Packing": "#8b5cf6",
-            "Shipped": "#06b6d4",
-            "Delivered": "#22c55e",
-            "Cancelled": "#ef4444",
-        }
-        color = colors.get(obj.status_order, "#6b7280")
-        return format_html(
-            '<span style="background:{};color:#fff;padding:3px 10px;'
-            'border-radius:12px;font-size:11px;font-weight:600;">{}</span>',
-            color, obj.status_order,
-        )
+    @admin.display(description="Alamat")
+    def alamat_status(self, obj):
+        if obj.alamat_lengkap:
+            return mark_safe('<span style="color:#22c55e;font-weight:bold;">✅ Lengkap</span>')
+        return mark_safe('<span style="color:#ef4444;font-weight:bold;">⏳ Belum Diisi</span>')
 
+    @admin.display(description="Link Pengisian")
+    def link_form_alamat(self, obj):
+        link = f"https://noska-hamster.shop/isi-alamat/{obj.token_alamat}"
+        return format_html('<input type="text" value="{}" readonly style="width:200px; padding:4px;" onclick="this.select(); document.execCommand(\\\'copy\\\'); alert(\\\'Link Copied!\\\');" />', link)
 
-@admin.register(OrderDetail)
-class OrderDetailAdmin(admin.ModelAdmin):
-    list_display = ["order_detail_id", "order", "inventory", "variant",
-                     "qty", "harga_satuan_formatted", "subtotal_formatted"]
-    list_filter = ["order__jenis_penjualan"]
-    search_fields = ["order__nomor_invoice"]
-    autocomplete_fields = ["order", "inventory", "variant"]
-    readonly_fields = ["subtotal"]
+    def get_readonly_fields(self, request, obj=None):
+        if obj: # editing an existing object
+            return self.readonly_fields + ["raw_rekapan"]
+        return self.readonly_fields
 
-    @admin.display(description="Harga Satuan")
-    def harga_satuan_formatted(self, obj):
-        return f"Rp{obj.harga_satuan_deal:,.0f}"
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('buat-invoice/', self.admin_site.admin_view(self.invoice_generator_view), name='core_transaction_buat_invoice'),
+        ]
+        return custom_urls + urls
 
-    @admin.display(description="Subtotal")
-    def subtotal_formatted(self, obj):
-        return f"Rp{obj.subtotal:,.0f}"
-
-
-@admin.register(Shipment)
-class ShipmentAdmin(admin.ModelAdmin):
-    list_display = ["shipment_id", "order", "courier", "nomor_resi",
-                     "tanggal_kirim", "status_kirim", "kondisi_hamster"]
-    list_filter = ["status_kirim", "kondisi_hamster", "courier", "tanggal_kirim"]
-    search_fields = ["order__nomor_invoice", "nomor_resi"]
-    autocomplete_fields = ["order", "courier"]
-    date_hierarchy = "tanggal_kirim"
-
-
-@admin.register(Ledger)
-class LedgerAdmin(admin.ModelAdmin):
-    list_display = [
-        "ledger_id", "tanggal_transaksi", "tipe_arus_badge",
-        "kategori_dana", "nominal_formatted", "order", "keterangan_short",
-    ]
-    list_filter = ["tipe_arus", "kategori_dana", "tanggal_transaksi"]
-    search_fields = ["keterangan", "order__nomor_invoice"]
-    autocomplete_fields = ["order"]
-    date_hierarchy = "tanggal_transaksi"
-    list_per_page = 30
-
-    @admin.display(description="Tipe Arus")
-    def tipe_arus_badge(self, obj):
-        if obj.tipe_arus == "Masuk":
-            return format_html(
-                '<span style="color:#22c55e;font-weight:700;">{}</span>',
-                "⬆️ Masuk",
+    def invoice_generator_view(self, request):
+        if request.method == "POST":
+            # Handle submission
+            nomor_wa = request.POST.get("nomor_wa")
+            qty_packing = int(request.POST.get("qty_packing", 0))
+            biaya_packing = qty_packing * 10000
+            
+            biaya_ongkir = int(request.POST.get("biaya_ongkir", 0))
+            
+            kurir_id = request.POST.get("kurir_id")
+            estimasi_hari = request.POST.get("estimasi_hari", "").strip()
+            
+            keterangan_kurir = ""
+            if kurir_id:
+                kurir = MasterCourier.objects.get(pk=kurir_id)
+                keterangan_kurir = f"{kurir.nama_kurir} {kurir.jenis_layanan}"
+                if estimasi_hari:
+                    keterangan_kurir += f" (est. {estimasi_hari} hari)"
+            
+            hamster_ids = request.POST.getlist("hamsters")
+            
+            # Clean WA
+            import re
+            wa_clean = re.sub(r'[^\d+]', '', nomor_wa)
+            customer, _ = Customer.objects.get_or_create(nomor_wa=wa_clean)
+            
+            # Get Hamsters and calculate total
+            hamsters = LiveInventory.objects.filter(inventory_id__in=hamster_ids)
+            total_hamster = sum([h.harga_display for h in hamsters])
+            total_bayar = total_hamster + biaya_packing + biaya_ongkir
+            
+            # Create Transaction
+            trx = Transaction.objects.create(
+                customer=customer,
+                status_pembayaran="PENDING",
+                biaya_packing=biaya_packing,
+                biaya_ongkir=biaya_ongkir,
+                total_bayar=total_bayar,
+                keterangan_kurir=keterangan_kurir
             )
-        return format_html(
-            '<span style="color:#ef4444;font-weight:700;">{}</span>',
-            "⬇️ Keluar",
-        )
-
-    @admin.display(description="Nominal")
-    def nominal_formatted(self, obj):
-        color = "#22c55e" if obj.tipe_arus == "Masuk" else "#ef4444"
-        return format_html(
-            '<span style="color:{};font-weight:600;">Rp{}</span>',
-            color, f"{obj.nominal:,.0f}",
-        )
-
-    @admin.display(description="Keterangan")
-    def keterangan_short(self, obj):
-        if len(obj.keterangan) > 50:
-            return obj.keterangan[:50] + "…"
-        return obj.keterangan
-
+            
+            # Link Hamsters
+            for h in hamsters:
+                h.status_ketersediaan = LiveInventory.StatusKetersediaan.HOLD
+                h.save()
+            trx.hamsters.set(hamsters)
+            
+            messages.success(request, f"Invoice WA berhasil dibuat untuk {wa_clean} dengan total Rp{total_bayar:,}. Menunggu Pembayaran.")
+            return redirect('admin:core_transaction_changelist')
+            
+        # Get active inventory to select
+        inventory = LiveInventory.objects.filter(status_ketersediaan="Tersedia").select_related("variant")
+        couriers = MasterCourier.objects.filter(is_active=True)
+        
+        context = {
+            **self.admin_site.each_context(request),
+            'opts': self.model._meta,
+            'title': 'Buat Invoice WA (Kalkulator)',
+            'inventory': inventory,
+            'couriers': couriers
+        }
+        return render(request, "admin/invoice_generator.html", context)
 
 # ══════════════════════════════════════════════
 # Admin Site Customization

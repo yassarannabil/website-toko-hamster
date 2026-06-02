@@ -6,9 +6,19 @@ Semua FK menggunakan PROTECT / SET_NULL agar data historis nota tidak hilang.
 """
 
 import uuid
+import os
 from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.core.files.storage import default_storage
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
+
+def get_video_storage():
+    if os.environ.get("CLOUDINARY_URL"):
+        from cloudinary_storage.storage import VideoMediaCloudinaryStorage
+        return VideoMediaCloudinaryStorage()
+    return default_storage
 
 
 # ──────────────────────────────────────────────
@@ -16,7 +26,7 @@ from django.core.validators import MinValueValidator
 # ──────────────────────────────────────────────
 class Customer(models.Model):
     customer_id = models.AutoField(primary_key=True)
-    nama_customer = models.CharField("Nama Customer", max_length=150)
+    nama_customer = models.CharField("Nama Customer", max_length=150, blank=True, null=True)
     nomor_wa = models.CharField("Nomor WhatsApp", max_length=20, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -28,7 +38,8 @@ class Customer(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.nama_customer} ({self.nomor_wa})"
+        nama = self.nama_customer if self.nama_customer else "Tanpa Nama"
+        return f"{nama} ({self.nomor_wa})"
 
 
 # ──────────────────────────────────────────────
@@ -50,6 +61,7 @@ class Address(models.Model):
     nomor_wa_penerima = models.CharField("No. WA Penerima", max_length=20)
     detail_alamat = models.TextField("Detail Alamat")
     kecamatan = models.CharField("Kecamatan", max_length=100, blank=True)
+    kelurahan_desa = models.CharField("Kelurahan / Desa", max_length=100, blank=True)
     kota_kabupaten = models.CharField("Kota / Kabupaten", max_length=100)
     provinsi = models.CharField("Provinsi", max_length=100)
     kode_pos = models.CharField("Kode Pos", max_length=10, blank=True)
@@ -73,12 +85,14 @@ class MasterVariant(models.Model):
         WINTER_WHITE = "Winter White", "Winter White"
         CAMPBELL = "Campbell", "Campbell"
         ROBOROVSKI = "Roborovski", "Roborovski"
+        PERLENGKAPAN = "Perlengkapan", "Perlengkapan"
 
     class JenisBulu(models.TextChoices):
         SHORT_HAIR = "Short Hair", "Short Hair"
         MEDIUM_HAIR = "Medium Hair", "Medium Hair"
         LONG_HAIR = "Long Hair", "Long Hair"
         REX = "Rex", "Rex"
+        TIDAK_ADA = "Tidak Ada", "Tidak Ada (Aksesoris)"
 
     variant_id = models.AutoField(primary_key=True)
     spesies = models.CharField(
@@ -143,6 +157,25 @@ class SetupSession(models.Model):
 # 5. Box (Kontainer dalam Sesi)
 # ──────────────────────────────────────────────
 class Box(models.Model):
+    class SpesiesChoices(models.TextChoices):
+        SYRIAN = "Syrian", "Syrian"
+        CAMPBELL = "Campbell", "Campbell"
+        WINTER_WHITE = "Winter White", "Winter White"
+        ROBOROVSKI = "Roborovski", "Roborovski"
+        MIX = "Mix", "Mix"
+        PERLENGKAPAN = "Perlengkapan", "Perlengkapan"
+
+    class KategoriBoxChoices(models.TextChoices):
+        SIAPAN = "Siapan", "Siapan"
+        ANAKAN = "Anakan", "Anakan"
+        INDUKAN = "Indukan", "Indukan"
+        MIX = "Mix", "Mix"
+
+    class JenisKelaminBoxChoices(models.TextChoices):
+        JANTAN = "Jantan", "Jantan"
+        BETINA = "Betina", "Betina"
+        MIX = "Mix", "Mix"
+
     box_id = models.AutoField(primary_key=True)
     session = models.ForeignKey(
         SetupSession,
@@ -155,8 +188,20 @@ class Box(models.Model):
         help_text="Contoh: Box A, Box B",
     )
     kategori = models.CharField(
-        "Kategori", max_length=150, blank=True,
-        help_text="Contoh: Syrian Betina Siapan, Campbell Mixed",
+        "Kategori (Legacy)", max_length=150, blank=True,
+        help_text="Field lama. Akan diabaikan jika field Spesies & Kategori baru diisi.",
+    )
+    spesies = models.CharField(
+        "Spesies", max_length=50, blank=True, null=True,
+        choices=SpesiesChoices.choices,
+    )
+    kategori_box = models.CharField(
+        "Kategori Box", max_length=50, blank=True, null=True,
+        choices=KategoriBoxChoices.choices,
+    )
+    jenis_kelamin_box = models.CharField(
+        "Jenis Kelamin", max_length=50, blank=True, null=True,
+        choices=JenisKelaminBoxChoices.choices,
     )
     urutan = models.PositiveIntegerField("Urutan Tampil", default=0)
 
@@ -168,6 +213,26 @@ class Box(models.Model):
         unique_together = ["session", "nama_box"]
 
     def __str__(self):
+        parts = []
+        if self.spesies:
+            parts.append(self.spesies)
+        
+        if self.kategori_box == "Mix" and self.jenis_kelamin_box == "Mix":
+            parts.append("Mix")
+        else:
+            cat_parts = []
+            if self.kategori_box:
+                cat_parts.append(self.kategori_box)
+            if self.jenis_kelamin_box:
+                cat_parts.append(self.jenis_kelamin_box)
+            if cat_parts:
+                parts.append(" ".join(cat_parts))
+        
+        structured_info = " — ".join(parts)
+        
+        if structured_info:
+            return f"{self.nama_box} — {structured_info}"
+        
         return f"{self.nama_box} — {self.kategori}" if self.kategori else self.nama_box
 
 
@@ -179,6 +244,7 @@ class LiveInventory(models.Model):
         TERSEDIA = "Tersedia", "Tersedia"
         TERJUAL = "Terjual", "Terjual"
         HOLD = "Hold", "Hold"
+        DISEMBUNYIKAN = "Disembunyikan", "Disembunyikan"
 
     class JenisKelamin(models.TextChoices):
         JANTAN = "Jantan", "Jantan"
@@ -218,11 +284,11 @@ class LiveInventory(models.Model):
     )
     usia_bulan = models.DecimalField(
         "Usia (bulan)", max_digits=3, decimal_places=1,
-        choices=USIA_CHOICES,
+        choices=USIA_CHOICES, null=True, blank=True
     )
     grade_corak = models.CharField(
         "Grade Corak", max_length=5,
-        choices=GradeCorak.choices,
+        choices=GradeCorak.choices, null=True, blank=True
     )
     kondisi_fisik = models.TextField("Kondisi Fisik", blank=True,
                                      help_text="Catatan kondisi: sehat, cacat ringan, dll.")
@@ -231,6 +297,7 @@ class LiveInventory(models.Model):
     )
     video_file = models.FileField(
         "Video Hamster", upload_to="inventory/video/", blank=True, null=True,
+        storage=get_video_storage,
     )
     harga_display = models.DecimalField(
         "Harga Display (Rp)", max_digits=12, decimal_places=0,
@@ -252,20 +319,19 @@ class LiveInventory(models.Model):
         if not self.kode_hamster:
             box_name = self.box.nama_box.replace(" ", "") if self.box else "X"
             prefix = f"HAM-{box_name}-"
-            # Search GLOBALLY by prefix to avoid collision across sessions
-            last = (
-                LiveInventory.objects
-                .filter(kode_hamster__startswith=prefix)
-                .exclude(kode_hamster__isnull=True)
-                .order_by("-kode_hamster")
-                .first()
-            )
-            seq = 1
-            if last and last.kode_hamster:
-                try:
-                    seq = int(last.kode_hamster.rsplit("-", 1)[-1]) + 1
-                except (ValueError, IndexError):
-                    seq = 1
+            # Find max sequence by parsing integers safely in Python
+            # because alphabetical order_by("-kode_hamster") thinks "HAM-A-9" > "HAM-A-10"
+            existing_codes = LiveInventory.objects.filter(kode_hamster__startswith=prefix).values_list('kode_hamster', flat=True)
+            max_seq = 0
+            for code in existing_codes:
+                if code:
+                    try:
+                        num = int(code.rsplit("-", 1)[-1])
+                        if num > max_seq:
+                            max_seq = num
+                    except (ValueError, IndexError):
+                        pass
+            seq = max_seq + 1
             self.kode_hamster = f"{prefix}{seq}"
         super().save(*args, **kwargs)
 
@@ -279,11 +345,10 @@ class LiveInventory(models.Model):
 # ──────────────────────────────────────────────
 class MasterCourier(models.Model):
     courier_id = models.AutoField(primary_key=True)
-    nama_kurir = models.CharField("Nama Kurir", max_length=100,
-                                  help_text="Contoh: JNE, Grab Instant, Kurir Pribadi")
-    jenis_layanan = models.CharField("Jenis Layanan", max_length=100,
-                                     help_text="Contoh: Same Day, Reguler, Cargo Hewan")
-    is_active = models.BooleanField("Aktif?", default=True)
+    nama_kurir = models.CharField("Nama Kurir/Ekspedisi", max_length=100, help_text="Contoh: TIKI, KIB, Karyati, dll")
+    jenis_layanan = models.CharField("Jenis Layanan", max_length=100, blank=True, help_text="Contoh: ONS, REG, VIP, dll")
+    estimasi_default_hari = models.PositiveIntegerField("Estimasi Default (Hari)", null=True, blank=True, help_text="Otomatis terisi saat kalkulator invoice. Contoh: 1")
+    is_active = models.BooleanField("Aktif", default=True)
 
     class Meta:
         db_table = "master_couriers"
@@ -295,223 +360,132 @@ class MasterCourier(models.Model):
         return f"{self.nama_kurir} — {self.jenis_layanan}"
 
 
-# ──────────────────────────────────────────────
-# 8. Orders
-# ──────────────────────────────────────────────
-class Order(models.Model):
-    class JenisPenjualan(models.TextChoices):
-        LIVE = "Live", "Live (Eceran Eksklusif)"
-        GROSIR = "Grosir", "Grosir (Masal)"
 
-    class StatusOrder(models.TextChoices):
-        PENDING = "Pending", "Pending"
-        CONFIRMED = "Confirmed", "Confirmed"
-        PACKING = "Packing", "Packing"
-        SHIPPED = "Shipped", "Shipped"
-        DELIVERED = "Delivered", "Delivered"
-        CANCELLED = "Cancelled", "Cancelled"
 
-    order_id = models.AutoField(primary_key=True)
-    nomor_invoice = models.CharField(
-        "No. Invoice", max_length=30, unique=True, editable=False,
-    )
+# ──────────────────────────────────────────────
+# 10. Transaction (Rekapan Penjualan Auto-Parse)
+# ──────────────────────────────────────────────
+class Transaction(models.Model):
+    transaction_id = models.AutoField(primary_key=True)
     customer = models.ForeignKey(
-        Customer, on_delete=models.PROTECT,
-        related_name="orders", verbose_name="Customer",
+        Customer, on_delete=models.CASCADE, related_name="transactions", verbose_name="Customer",
+        null=True, blank=True # Nullable for auto-parsing
     )
-    address = models.ForeignKey(
-        Address, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name="orders", verbose_name="Alamat Pengiriman",
-    )
-    tanggal_order = models.DateTimeField("Tanggal Order", auto_now_add=True)
-    jenis_penjualan = models.CharField(
-        "Jenis Penjualan", max_length=10,
-        choices=JenisPenjualan.choices,
-    )
-    status_order = models.CharField(
-        "Status Order", max_length=20,
-        choices=StatusOrder.choices, default=StatusOrder.PENDING,
-    )
-    total_order = models.DecimalField(
-        "Total Order (Rp)", max_digits=15, decimal_places=0, default=0,
-    )
-    catatan_order = models.TextField("Catatan Order", blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "orders"
-        verbose_name = "Order"
-        verbose_name_plural = "Orders"
-        ordering = ["-tanggal_order"]
-
-    def save(self, *args, **kwargs):
-        if not self.nomor_invoice:
-            from django.utils import timezone
-            now = timezone.now()
-            prefix = "NH"
-            date_str = now.strftime("%Y%m%d")
-            # Cari urutan terakhir hari ini
-            last = (
-                Order.objects
-                .filter(nomor_invoice__startswith=f"{prefix}-{date_str}")
-                .order_by("-nomor_invoice")
-                .first()
-            )
-            seq = 1
-            if last:
-                try:
-                    seq = int(last.nomor_invoice.split("-")[-1]) + 1
-                except ValueError:
-                    seq = 1
-            self.nomor_invoice = f"{prefix}-{date_str}-{seq:04d}"
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.nomor_invoice} | {self.customer.nama_customer}"
-
-
-# ──────────────────────────────────────────────
-# 9. Order Details
-# ──────────────────────────────────────────────
-class OrderDetail(models.Model):
-    order_detail_id = models.AutoField(primary_key=True)
-    order = models.ForeignKey(
-        Order, on_delete=models.CASCADE,
-        related_name="details", verbose_name="Order",
-    )
-    # Live → inventory_id (qty = 1)
-    inventory = models.ForeignKey(
-        LiveInventory, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name="order_details", verbose_name="Live Inventory Item",
-        help_text="Isi untuk penjualan LIVE (qty otomatis 1).",
-    )
-    # Grosir → variant_id (qty >= 1)
-    variant = models.ForeignKey(
-        MasterVariant, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name="order_details", verbose_name="Varian (Grosir)",
-        help_text="Isi untuk penjualan GROSIR.",
-    )
-    qty = models.PositiveIntegerField("Qty", default=1,
-                                      validators=[MinValueValidator(1)])
-    harga_satuan_deal = models.DecimalField(
-        "Harga Satuan Deal (Rp)", max_digits=12, decimal_places=0,
-    )
-    subtotal = models.DecimalField(
-        "Subtotal (Rp)", max_digits=15, decimal_places=0, editable=False, default=0,
-    )
-    catatan_khusus = models.TextField("Catatan Khusus", blank=True)
-
-    class Meta:
-        db_table = "order_details"
-        verbose_name = "Detail Order"
-        verbose_name_plural = "Detail Order"
-
-    def save(self, *args, **kwargs):
-        self.subtotal = self.qty * self.harga_satuan_deal
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        item = self.inventory or self.variant or "—"
-        return f"Detail #{self.order_detail_id} | {item} x{self.qty}"
-
-
-# ──────────────────────────────────────────────
-# 10. Shipments
-# ──────────────────────────────────────────────
-class Shipment(models.Model):
-    class StatusKirim(models.TextChoices):
-        MENUNGGU = "Menunggu Pickup", "Menunggu Pickup"
-        DALAM_PERJALANAN = "Dalam Perjalanan", "Dalam Perjalanan"
-        SAMPAI = "Sampai", "Sampai"
-        GAGAL = "Gagal", "Gagal"
-
-    class KondisiHamster(models.TextChoices):
-        SEHAT = "Sehat", "Sehat"
-        STRES_RINGAN = "Stres Ringan", "Stres Ringan"
-        CEDERA = "Cedera", "Cedera"
-        MATI = "Mati (DOA)", "Mati (DOA)"
-
-    shipment_id = models.AutoField(primary_key=True)
-    order = models.OneToOneField(
-        Order, on_delete=models.CASCADE,
-        related_name="shipment", verbose_name="Order",
-    )
-    courier = models.ForeignKey(
-        MasterCourier, on_delete=models.PROTECT,
-        related_name="shipments", verbose_name="Kurir",
-    )
+    
+    # Hasil parsing rekapan
+    PAYMENT_STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('BELUM LUNAS', 'Belum Lunas'),
+        ('DP', 'DP'),
+        ('LUNAS', 'Lunas'),
+        ('CANCELLED', 'Dibatalkan'),
+        ('DIKIRIM', 'Dikirim'),
+        ('SAMPAI', 'Sampai (Selesai)'),
+        ('GARANSI', 'Garansi (Ada Masalah)'),
+        ('REFUNDED', 'Refunded'),
+    ]
+    status_pembayaran = models.CharField("Status Bayar", max_length=50, choices=PAYMENT_STATUS_CHOICES, default='PENDING')
+    metode_pembayaran = models.CharField("Metode Pembayaran", max_length=50, blank=True)
+    sudah_video_packing = models.BooleanField("Sudah Video Packing", default=False)
+    biaya_packing = models.PositiveIntegerField("Biaya Packing", default=0)
+    biaya_ongkir = models.PositiveIntegerField("Biaya Ongkir", default=0)
+    total_bayar = models.PositiveIntegerField("Total Bayar (Hamster + Packing + Ongkir)", default=0)
+    nominal_dp = models.PositiveIntegerField("Nominal DP", default=0)
+    nominal_refund = models.PositiveIntegerField("Nominal Refund (Garansi)", default=0)
     nomor_resi = models.CharField("Nomor Resi", max_length=100, blank=True)
+    keterangan_kurir = models.CharField("Pengiriman", max_length=200, blank=True)
+    
+    # Relasi Hamster
+    hamsters = models.ManyToManyField("LiveInventory", related_name="transaksi", blank=True, verbose_name="Hamster")
+    
+    # Teks asli
+    raw_rekapan = models.TextField("Teks Rekapan Asli", blank=True)
+    
+    # Form Alamat
+    alamat = models.ForeignKey(
+        Address, on_delete=models.SET_NULL, null=True, blank=True, related_name="transaksi", verbose_name="Alamat Pengiriman"
+    )
+    token_alamat = models.UUIDField("Token Alamat", default=uuid.uuid4, editable=False, unique=True)
+    alamat_lengkap = models.BooleanField("Alamat Sudah Lengkap?", default=False)
     tanggal_kirim = models.DateField("Tanggal Kirim", null=True, blank=True)
-    estimasi_hari = models.PositiveSmallIntegerField("Estimasi Hari", default=1)
-    tanggal_diterima = models.DateField("Tanggal Diterima", null=True, blank=True)
-    status_kirim = models.CharField(
-        "Status Kirim", max_length=30,
-        choices=StatusKirim.choices, default=StatusKirim.MENUNGGU,
-    )
-    kondisi_hamster = models.CharField(
-        "Kondisi Hamster Saat Tiba", max_length=30,
-        choices=KondisiHamster.choices, blank=True,
-    )
-    catatan_pengiriman = models.TextField("Catatan Pengiriman", blank=True)
-
-    class Meta:
-        db_table = "shipments"
-        verbose_name = "Pengiriman"
-        verbose_name_plural = "Pengiriman"
-        ordering = ["-tanggal_kirim"]
-
-    def __str__(self):
-        return f"Ship #{self.shipment_id} — {self.order.nomor_invoice}"
-
-
-# ──────────────────────────────────────────────
-# 11. Ledger (Buku Kas)
-# ──────────────────────────────────────────────
-class Ledger(models.Model):
-    class TipeArus(models.TextChoices):
-        MASUK = "Masuk", "Pemasukan"
-        KELUAR = "Keluar", "Pengeluaran"
-
-    class KategoriDana(models.TextChoices):
-        PENJUALAN_LIVE = "Penjualan Live", "Penjualan Live"
-        PENJUALAN_GROSIR = "Penjualan Grosir", "Penjualan Grosir"
-        ONGKIR = "Ongkir", "Ongkir"
-        PAKAN = "Pakan", "Pakan"
-        KANDANG = "Kandang & Peralatan", "Kandang & Peralatan"
-        KESEHATAN = "Kesehatan", "Kesehatan"
-        OPERASIONAL = "Operasional", "Operasional"
-        LAINNYA = "Lainnya", "Lainnya"
-
-    ledger_id = models.AutoField(primary_key=True)
-    order = models.ForeignKey(
-        Order, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name="ledger_entries", verbose_name="Order Terkait",
-        help_text="Kosongkan untuk pengeluaran bebas.",
-    )
-    tanggal_transaksi = models.DateField("Tanggal Transaksi")
-    tipe_arus = models.CharField(
-        "Tipe Arus", max_length=10, choices=TipeArus.choices,
-    )
-    kategori_dana = models.CharField(
-        "Kategori", max_length=30, choices=KategoriDana.choices,
-    )
-    nominal = models.DecimalField(
-        "Nominal (Rp)", max_digits=15, decimal_places=0,
-        validators=[MinValueValidator(0)],
-    )
-    keterangan = models.TextField("Keterangan", blank=True)
+    hamsters_mati = models.TextField("Hamster Bermasalah", blank=True, null=True)
+    alasan_batal = models.TextField("Alasan Pembatalan", blank=True, null=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "ledger"
-        verbose_name = "Buku Kas"
-        verbose_name_plural = "Buku Kas"
-        ordering = ["-tanggal_transaksi", "-created_at"]
+        db_table = "transactions"
+        verbose_name = "Transaksi"
+        verbose_name_plural = "Transaksi"
+        ordering = ["-created_at"]
 
     def __str__(self):
-        arrow = "⬆️" if self.tipe_arus == self.TipeArus.MASUK else "⬇️"
-        return f"{arrow} Rp{self.nominal:,.0f} — {self.kategori_dana} ({self.tanggal_transaksi})"
+        return f"Trx #{self.transaction_id} — {self.customer.nomor_wa if self.customer else 'No Customer'}"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        hamsters_to_link = []
+        
+        # Auto-parse ONLY if it's a new record
+        if self.raw_rekapan and is_new:
+            lines = [line.strip() for line in self.raw_rekapan.strip().split('\n') if line.strip()]
+            
+            if len(lines) >= 1:
+                # Parse WA (Line 1)
+                import re
+                wa_raw = lines[0]
+                wa_clean = re.sub(r'[^\d+]', '', wa_raw)
+                # Create or get customer
+                customer, _ = Customer.objects.get_or_create(nomor_wa=wa_clean)
+                self.customer = customer
+            
+            if len(lines) >= 2:
+                # Parse Payment (Line 2) e.g., "LUNAS (QRIS) = 83k"
+                pay_line = lines[1].upper()
+                if "BELUM LUNAS" in pay_line:
+                    self.status_pembayaran = "BELUM LUNAS"
+                elif "LUNAS" in pay_line:
+                    self.status_pembayaran = "LUNAS"
+                else:
+                    self.status_pembayaran = "DP" # default
+                
+                # Metode
+                if "(QRIS)" in pay_line:
+                    self.metode_pembayaran = "QRIS"
+                elif "(BCA)" in pay_line:
+                    self.metode_pembayaran = "BCA"
+                elif "(MANDIRI)" in pay_line:
+                    self.metode_pembayaran = "MANDIRI"
+                    
+                # Total Bayar (Find first number before 'k' or after '=')
+                import re
+                match = re.search(r'=\s*(\d+)k?', pay_line, re.IGNORECASE)
+                if match:
+                    val = int(match.group(1))
+                    if 'k' in pay_line.lower() and val < 10000:
+                        val *= 1000
+                    self.total_bayar = val
+
+            if len(lines) >= 3 and is_new:
+                # Parse Hamsters (Line 3) e.g., "HAM-C-5, HAM-D-5"
+                import re
+                codes = re.findall(r'HAM-[A-Z0-9]+-\d+', lines[2], re.IGNORECASE)
+                if codes:
+                    # Find hamsters
+                    from .models import LiveInventory
+                    for code in codes:
+                        h = LiveInventory.objects.filter(kode_hamster__iexact=code).first()
+                        if h:
+                            if h.box.spesies != Box.SpesiesChoices.PERLENGKAPAN and h.box.nama_box.lower() != 'aksesoris':
+                                h.status_ketersediaan = LiveInventory.StatusKetersediaan.TERJUAL
+                                h.save()
+                            hamsters_to_link.append(h)
+                            
+            if len(lines) >= 4:
+                # Parse Courier (Line 4)
+                self.keterangan_kurir = lines[3]
+
+        super().save(*args, **kwargs)
+        
+        if hamsters_to_link:
+            self.hamsters.add(*hamsters_to_link)

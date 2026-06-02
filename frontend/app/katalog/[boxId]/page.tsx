@@ -64,7 +64,9 @@ export default async function BoxDetailPage({
 
           <div className="text-center">
             <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              Box {boxInfo?.nama_box || boxId}
+              {boxInfo?.nama_box?.toLowerCase() === "aksesoris" || boxInfo?.spesies === "Perlengkapan" 
+                ? boxInfo.nama_box 
+                : `Box ${boxInfo?.nama_box || boxId}`}
             </h1>
             {boxInfo?.kategori && (
               <p className="mx-auto mt-2 text-sm text-brand-100/80 sm:text-base">
