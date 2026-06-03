@@ -21,13 +21,19 @@ def get_video_storage():
     return default_storage
 
 
+from django.contrib.auth.models import User
+
 # ──────────────────────────────────────────────
 # 1. Customers
 # ──────────────────────────────────────────────
 class Customer(models.Model):
     customer_id = models.AutoField(primary_key=True)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="customer_profile", null=True, blank=True,
+        help_text="Terhubung ke akun login (bisa kosong untuk pelanggan legacy)"
+    )
     nama_customer = models.CharField("Nama Customer", max_length=150, blank=True, null=True)
-    nomor_wa = models.CharField("Nomor WhatsApp", max_length=20, unique=True)
+    nomor_wa = models.CharField("Nomor WhatsApp", max_length=20, unique=True, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -39,6 +45,8 @@ class Customer(models.Model):
 
     def __str__(self):
         nama = self.nama_customer if self.nama_customer else "Tanpa Nama"
+        if self.user:
+            return f"{nama} ({self.user.email})"
         return f"{nama} ({self.nomor_wa})"
 
 
@@ -65,6 +73,7 @@ class Address(models.Model):
     kota_kabupaten = models.CharField("Kota / Kabupaten", max_length=100)
     provinsi = models.CharField("Provinsi", max_length=100)
     kode_pos = models.CharField("Kode Pos", max_length=10, blank=True)
+    destination_id = models.CharField("Destination ID (Ongkir)", max_length=20, blank=True, help_text="ID Kelurahan dari RajaOngkir untuk kalkulasi ongkir")
     is_default = models.BooleanField("Alamat Utama?", default=False)
 
     class Meta:
@@ -411,6 +420,10 @@ class Transaction(models.Model):
     hamsters_mati = models.TextField("Hamster Bermasalah", blank=True, null=True)
     alasan_batal = models.TextField("Alasan Pembatalan", blank=True, null=True)
     
+    # DOKU Payment Gateway
+    payment_url = models.URLField("DOKU Payment URL", max_length=500, blank=True)
+    doku_token = models.CharField("DOKU Token", max_length=255, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -489,3 +502,62 @@ class Transaction(models.Model):
         
         if hamsters_to_link:
             self.hamsters.add(*hamsters_to_link)
+
+# ──────────────────────────────────────────────
+# 11. E-Commerce (Cart)
+# ──────────────────────────────────────────────
+class Cart(models.Model):
+    customer = models.OneToOneField(Customer, on_delete=models.CASCADE, related_name="cart")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "carts"
+        verbose_name = "Keranjang"
+        verbose_name_plural = "Keranjang"
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name="items")
+    inventory = models.ForeignKey(LiveInventory, on_delete=models.CASCADE)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "cart_items"
+        verbose_name = "Item Keranjang"
+        verbose_name_plural = "Item Keranjang"
+        unique_together = ["cart", "inventory"]
+
+
+# ──────────────────────────────────────────────
+# 12. Internal Chat System
+# ──────────────────────────────────────────────
+class ChatRoom(models.Model):
+    customer = models.OneToOneField(Customer, on_delete=models.CASCADE, related_name="chat_room")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "chat_rooms"
+        verbose_name = "Ruang Chat"
+        verbose_name_plural = "Ruang Chat"
+
+class ChatMessage(models.Model):
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
+    sender_is_admin = models.BooleanField("Kirim dari Admin?", default=False)
+    message = models.TextField("Pesan")
+    related_inventory = models.ForeignKey(
+        "LiveInventory", 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name="chat_mentions",
+        verbose_name="Terkait Produk"
+    )
+    is_read = models.BooleanField("Sudah Dibaca?", default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "chat_messages"
+        verbose_name = "Pesan Chat"
+        verbose_name_plural = "Pesan Chat"
+        ordering = ["created_at"]
+

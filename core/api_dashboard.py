@@ -798,6 +798,104 @@ class DashboardItemDetailAPIView(APIView):
             "box_id": item.box_id,
         })
 
+class DashboardChatRoomsAPIView(APIView):
+    """GET /api/dashboard/chat/rooms/ — Admin only, relies on Next.js middleware."""
+    from rest_framework.permissions import AllowAny
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from .models import ChatRoom
+        rooms = ChatRoom.objects.all().select_related('customer')
+        data = []
+        for r in rooms:
+            unread_count = r.messages.filter(sender_is_admin=False, is_read=False).count()
+            data.append({
+                "room_id": r.id,
+                "customer_name": r.customer.nama_customer or r.customer.user.first_name if r.customer.user else "Customer",
+                "unread_count": unread_count,
+                "last_updated": r.updated_at
+            })
+        return Response(data)
+
+class DashboardChatMessagesAPIView(APIView):
+    """GET/POST /api/dashboard/chat/rooms/<id>/messages/"""
+    from rest_framework.permissions import AllowAny
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request, room_id):
+        from .models import ChatRoom
+        try:
+            room = ChatRoom.objects.get(pk=room_id)
+        except ChatRoom.DoesNotExist:
+            return Response({"error": "Ruang chat tidak ditemukan."}, status=404)
+        
+        # Mark user messages as read (admin is reading them)
+        room.messages.filter(sender_is_admin=False, is_read=False).update(is_read=True)
+
+        messages = room.messages.all().select_related('related_inventory', 'related_inventory__variant').order_by('created_at')
+        data = []
+        for m in messages:
+            inv_data = None
+            if m.related_inventory:
+                inv = m.related_inventory
+                inv_data = {
+                    "inventory_id": inv.inventory_id,
+                    "kode_hamster": inv.kode_hamster,
+                    "varian": str(inv.variant),
+                    "harga": inv.harga_display,
+                    "foto_preview": request.build_absolute_uri(inv.foto_preview.url) if inv.foto_preview else None,
+                }
+            
+            data.append({
+                "id": m.id,
+                "message": m.message,
+                "sender_is_admin": m.sender_is_admin,
+                "is_read": m.is_read,
+                "related_inventory": inv_data,
+                "created_at": m.created_at
+            })
+
+        return Response(data)
+
+    def post(self, request, room_id):
+        from .models import ChatRoom, ChatMessage
+        message_text = request.data.get("message", "").strip()
+        inventory_id = request.data.get("inventory_id")
+        
+        if not message_text and not inventory_id:
+            return Response({"error": "Pesan tidak boleh kosong."}, status=400)
+            
+        try:
+            room = ChatRoom.objects.get(pk=room_id)
+        except ChatRoom.DoesNotExist:
+            return Response({"error": "Ruang chat tidak ditemukan."}, status=404)
+            
+        related_inv = None
+        if inventory_id:
+            from .models import LiveInventory
+            related_inv = LiveInventory.objects.filter(pk=inventory_id).first()
+                
+        msg = ChatMessage.objects.create(
+            room=room,
+            sender_is_admin=True,  # Always true for admin dashboard
+            message=message_text,
+            related_inventory=related_inv
+        )
+        
+        room.updated_at = msg.created_at
+        room.save()
+        
+        return Response({
+            "id": msg.id,
+            "message": msg.message,
+            "sender_is_admin": msg.sender_is_admin,
+            "is_read": msg.is_read,
+            "created_at": msg.created_at
+        }, status=201)
+
+
     def delete(self, request, item_id):
         from .models import LiveInventory
         try:

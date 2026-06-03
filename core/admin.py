@@ -56,7 +56,7 @@ class CustomerAdmin(admin.ModelAdmin):
 
     @admin.display(description="Jumlah Order")
     def jumlah_order(self, obj):
-        return obj.orders.count()
+        return obj.transactions.count()
 
 
 @admin.register(Address)

@@ -81,6 +81,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <Link href="/dashboard/inventory" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
             Stok Live
           </Link>
+          <Link href="/dashboard/chat" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
+            Chat Pelanggan
+          </Link>
         </nav>
         <div className="p-4 border-t border-gray-200 space-y-2">
           <button

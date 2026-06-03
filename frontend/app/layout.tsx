@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   },
 };
 
+import AppLayoutWrapper from "./components/AppLayoutWrapper";
+import Script from "next/script";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,7 +31,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <Script src="https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js" strategy="beforeInteractive" />
+        <AppLayoutWrapper>{children}</AppLayoutWrapper>
+      </body>
     </html>
   );
 }

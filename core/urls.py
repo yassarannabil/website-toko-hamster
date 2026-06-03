@@ -13,7 +13,8 @@ from .api_dashboard import (
     DashboardUploadMediaAPIView, DashboardSessionsAPIView,
     DashboardBoxesBySessionAPIView, DashboardSessionDetailAPIView,
     DashboardSessionDuplicateAPIView, DashboardBoxDetailAPIView,
-    DashboardItemDetailAPIView, DashboardBoxItemsAPIView
+    DashboardItemDetailAPIView, DashboardBoxItemsAPIView,
+    DashboardChatRoomsAPIView, DashboardChatMessagesAPIView
 )
 from .api_ongkir import (
     OngkirProvincesAPIView, 
@@ -22,10 +23,37 @@ from .api_ongkir import (
     OngkirSubdistrictsAPIView,
     OngkirCalculateAPIView
 )
+from .api_auth import RegisterAPIView, LoginAPIView, ProfileAPIView, CustomerAddressAPIView, CustomerTransactionsAPIView
+from .api_store import CartAPIView, CheckoutAPIView, InventoryDetailAPIView
+from .api_payment import DokuNotificationAPIView
+from .api_chat import ChatRoomAPIView, ChatMessageAPIView
 
 app_name = "core"
 
 urlpatterns = [
+    # ----------------------------------------------------
+    # Auth APIs (Customer)
+    # ----------------------------------------------------
+    path("auth/register/", RegisterAPIView.as_view(), name="api_auth_register"),
+    path("auth/login/", LoginAPIView.as_view(), name="api_auth_login"),
+    path("auth/profile/", ProfileAPIView.as_view(), name="api_auth_profile"),
+    path("auth/addresses/", CustomerAddressAPIView.as_view(), name="api_auth_addresses"),
+    path("auth/transactions/", CustomerTransactionsAPIView.as_view(), name="api_auth_transactions"),
+
+    # ----------------------------------------------------
+    # Store APIs (Cart & Checkout & Payment)
+    # ----------------------------------------------------
+    path("store/cart/", CartAPIView.as_view(), name="api_store_cart"),
+    path("store/checkout/", CheckoutAPIView.as_view(), name="api_store_checkout"),
+    path("store/inventory/<int:inventory_id>/", InventoryDetailAPIView.as_view(), name="api_store_inventory_detail"),
+    path("payment/doku-notify/", DokuNotificationAPIView.as_view(), name="api_payment_doku_notify"),
+
+    # ----------------------------------------------------
+    # Chat APIs (Internal)
+    # ----------------------------------------------------
+    path("chat/rooms/", ChatRoomAPIView.as_view(), name="api_chat_rooms"),
+    path("chat/rooms/<int:room_id>/messages/", ChatMessageAPIView.as_view(), name="api_chat_messages"),
+
     # ----------------------------------------------------
     # Public APIs (Katalog)
     # ----------------------------------------------------
@@ -51,6 +79,8 @@ urlpatterns = [
     path("dashboard/variants/", DashboardVariantsAPIView.as_view(), name="api_dashboard_variants"),
     path("dashboard/inventory/add/", DashboardAddInventoryAPIView.as_view(), name="api_dashboard_inventory_add"),
     path("dashboard/inventory/<int:pk>/upload/", DashboardUploadMediaAPIView.as_view(), name="api_dashboard_inventory_upload"),
+    path("dashboard/chat/rooms/", DashboardChatRoomsAPIView.as_view(), name="api_dashboard_chat_rooms"),
+    path("dashboard/chat/rooms/<int:room_id>/messages/", DashboardChatMessagesAPIView.as_view(), name="api_dashboard_chat_messages"),
 
     # ----------------------------------------------------
     # Public API (Form Alamat Customer)

@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "rest_framework.authtoken",
     "corsheaders",
     "cloudinary",
     "cloudinary_storage",
@@ -175,7 +176,7 @@ if os.environ.get("FRONTEND_URL"):
 # ──────────────────────────────────────────────
 # Frontend Public URL (for customer-facing links)
 # ──────────────────────────────────────────────
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://noska-hamster.shop")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 # ──────────────────────────────────────────────
 # Komerce (RajaOngkir) Cek Ongkir API
@@ -183,9 +184,20 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://noska-hamster.shop")
 KOMERCE_API_KEY = os.environ.get("KOMERCE_API_KEY", "")
 
 # ──────────────────────────────────────────────
+# DOKU Payment Gateway (Jokul Checkout)
+# ──────────────────────────────────────────────
+DOKU_CLIENT_ID = os.environ.get("DOKU_CLIENT_ID", "BRN-0239-1780472793618") # Default from docs
+DOKU_SECRET_KEY = os.environ.get("DOKU_SECRET_KEY", "SK-VNdsXpBdjM9UNfLbQOlI")
+DOKU_BASE_URL = os.environ.get("DOKU_BASE_URL", "https://api-sandbox.doku.com")
+
+# ──────────────────────────────────────────────
 # Django REST Framework
 # ──────────────────────────────────────────────
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],

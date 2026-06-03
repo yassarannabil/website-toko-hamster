@@ -2,7 +2,7 @@ import { WHATSAPP_NUMBER } from "../data/hamsters";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-brand-100 bg-surface-muted">
+    <footer className="hidden border-t border-brand-100 bg-surface-muted md:block">
       <div className="mx-auto max-w-6xl px-4 py-8 text-center sm:py-10">
         <p className="text-sm font-semibold text-text-secondary">
           🐹 Noska Hamster
