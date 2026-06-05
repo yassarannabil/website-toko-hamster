@@ -17,6 +17,15 @@ const nextConfig = {
       }
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/katalog',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

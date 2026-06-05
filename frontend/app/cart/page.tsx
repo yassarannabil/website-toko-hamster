@@ -39,7 +39,7 @@ export default function CartPage() {
       });
 
       if (!res.ok) throw new Error("Gagal mengambil data keranjang.");
-      
+
       const data = await res.json();
       setItems(data.items || []);
       setTotalHarga(data.total_harga || 0);
@@ -77,7 +77,7 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-[#fdfcfb] flex flex-col">
       <main className="flex-grow container mx-auto px-4 py-8 max-w-4xl">
-        <h1 className="text-3xl font-extrabold text-[#1a1614] mb-8">Keranjang Belanja 🛒</h1>
+        <h1 className="text-3xl font-extrabold text-[#1a1614] mb-8">Keranjang Belanja</h1>
 
         {error ? (
           <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>
@@ -110,7 +110,7 @@ export default function CartPage() {
                     </div>
                     <div className="flex justify-between items-center mt-2">
                       <span className="font-bold text-[#ea8b3a]">Rp{item.harga.toLocaleString("id-ID")}</span>
-                      <button 
+                      <button
                         onClick={() => handleRemoveItem(item.cart_item_id)}
                         className="text-sm text-red-500 hover:text-red-700 font-semibold"
                       >
@@ -121,7 +121,7 @@ export default function CartPage() {
                 </div>
               ))}
             </div>
-            
+
             {/* Ringkasan Belanja */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit sticky top-8">
               <h2 className="text-xl font-bold text-[#1a1614] mb-4">Ringkasan</h2>
@@ -130,7 +130,7 @@ export default function CartPage() {
                 <span className="font-bold text-[#1a1614]">Rp{totalHarga.toLocaleString("id-ID")}</span>
               </div>
               <div className="border-t border-gray-100 my-4"></div>
-              <Link 
+              <Link
                 href="/checkout"
                 className="w-full block text-center py-3 bg-gradient-to-r from-[#ea8b3a] to-[#dc7030] text-white font-bold rounded-xl hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
               >

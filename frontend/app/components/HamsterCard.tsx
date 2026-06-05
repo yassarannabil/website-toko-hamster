@@ -39,7 +39,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
       router.push("/login");
       return;
     }
-    
+
     setIsAdding(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/store/cart/`, {
@@ -50,7 +50,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
         },
         body: JSON.stringify({ inventory_id: item.inventory_id })
       });
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menambahkan.");
       alert(data.message);
@@ -62,36 +62,33 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
   };
 
   // Clean variant name for accessories (Remove "Perlengkapan - " prefix)
-  const cleanVarian = item.varian.startsWith("Perlengkapan - ") 
-    ? item.varian.replace("Perlengkapan - ", "") 
+  const cleanVarian = item.varian.startsWith("Perlengkapan - ")
+    ? item.varian.replace("Perlengkapan - ", "")
     : item.varian;
 
   return (
     <article
       id={`card-${displayId}`}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-surface-card shadow-sm border border-brand-100/60 transition-all duration-300 ${
-        (unavailable && !isAdminView)
+      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-surface-card shadow-sm border border-brand-100/60 transition-all duration-300 ${(unavailable && !isAdminView)
           ? "grayscale opacity-75"
           : "hover:shadow-xl hover:shadow-brand-200/40 hover:-translate-y-1"
-      }`}
+        }`}
     >
       {/* Status Badge */}
       <div className="absolute top-3 left-3 z-10">
         <span
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold tracking-wide backdrop-blur-sm ${
-            sold
+          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold tracking-wide backdrop-blur-sm ${sold
               ? "bg-red-500/90 text-white"
               : hold
-              ? "bg-orange-500/90 text-white"
-              : hidden
-              ? "bg-gray-500/90 text-white"
-              : "bg-emerald-500/90 text-white"
-          }`}
+                ? "bg-orange-500/90 text-white"
+                : hidden
+                  ? "bg-gray-500/90 text-white"
+                  : "bg-emerald-500/90 text-white"
+            }`}
         >
           <span
-            className={`inline-block h-1.5 w-1.5 rounded-full ${
-              sold ? "bg-red-200" : hold ? "bg-orange-200" : hidden ? "bg-gray-300" : "bg-white animate-pulse"
-            }`}
+            className={`inline-block h-1.5 w-1.5 rounded-full ${sold ? "bg-red-200" : hold ? "bg-orange-200" : hidden ? "bg-gray-300" : "bg-white animate-pulse"
+              }`}
           />
           {sold ? "Terjual" : hold ? "Dipesan" : hidden ? "Disembunyikan" : "Tersedia"}
         </span>
@@ -128,9 +125,8 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
                 src={getRelativeMediaUrl(item.foto_preview) || ""}
                 alt={`${item.varian} — ${displayId}`}
                 loading="lazy"
-                className={`absolute inset-0 h-full w-full object-contain bg-surface-muted transition-transform duration-500 ${
-                  (unavailable && !isAdminView) ? "" : "group-hover:scale-105"
-                }`}
+                className={`absolute inset-0 h-full w-full object-contain bg-surface-muted transition-transform duration-500 ${(unavailable && !isAdminView) ? "" : "group-hover:scale-105"
+                  }`}
               />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface-muted text-text-muted">
@@ -193,7 +189,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
               {item.jenis_kelamin}
             </span>
           )}
-          
+
           {item.usia_bulan && (
             <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-muted px-2.5 py-1 text-xs font-medium text-text-secondary">
               <svg
@@ -219,7 +215,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
             </span>
           )}
         </div>
-        
+
         {/* Catatan Kondisi Fisik */}
         {item.kondisi_fisik && item.kondisi_fisik.trim() !== "" && (
           <div className="text-[11px] bg-amber-50/70 text-amber-800 border border-amber-100/80 rounded-xl p-2.5 leading-relaxed font-medium flex items-start gap-1.5 mt-0.5">
@@ -233,9 +229,8 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
 
         {/* Price */}
         <p
-          className={`text-xl font-extrabold tracking-tight sm:text-2xl ${
-            (unavailable && !isAdminView) ? "text-sold-gray line-through" : "text-brand-600"
-          }`}
+          className={`text-xl font-extrabold tracking-tight sm:text-2xl ${(unavailable && !isAdminView) ? "text-sold-gray line-through" : "text-brand-600"
+            }`}
         >
           {formatRupiah(item.harga_display)}
         </p>
@@ -244,15 +239,14 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
         {isAdminView ? (
           <button
             disabled
-            className={`mt-auto flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border ${
-              sold 
-                ? "bg-red-50 border-red-200 text-red-600" 
-                : hold 
-                ? "bg-orange-50 border-orange-200 text-orange-600" 
-                : hidden
-                ? "bg-gray-100 border-gray-300 text-gray-500"
-                : "bg-emerald-50 border-emerald-200 text-emerald-600"
-            }`}
+            className={`mt-auto flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border ${sold
+                ? "bg-red-50 border-red-200 text-red-600"
+                : hold
+                  ? "bg-orange-50 border-orange-200 text-orange-600"
+                  : hidden
+                    ? "bg-gray-100 border-gray-300 text-gray-500"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-600"
+              }`}
           >
             {sold ? "Telah Terjual" : hold ? "Sedang Dipesan" : hidden ? "Disembunyikan" : "Tersedia"}
           </button>
@@ -276,7 +270,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
               href={`/chat?inventory_id=${item.inventory_id}`}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-white border border-brand-200 py-3 text-sm font-bold text-brand-600 transition-all duration-200 hover:bg-brand-50 active:scale-[0.97]"
             >
-              💬 Tanyakan di Chat
+              Tanyakan di Chat
             </Link>
           </div>
         )}

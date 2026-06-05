@@ -172,7 +172,14 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#fdfcfb] flex flex-col">
       <main className="flex-grow container mx-auto px-4 py-8 max-w-5xl">
-        <h1 className="text-3xl font-extrabold text-[#1a1614] mb-8">Checkout 📦</h1>
+        <div className="flex items-center gap-4 mb-8">
+          <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-3xl font-extrabold text-[#1a1614]">Checkout</h1>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7 space-y-6">
@@ -260,16 +267,14 @@ export default function CheckoutPage() {
                     <label
                       key={i}
                       onClick={() => setSelectedShipping(opt)}
-                      className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                        selectedShipping?.name === opt.name && selectedShipping?.service === opt.service
-                          ? 'border-[#ea8b3a] bg-orange-50/30'
-                          : 'border-gray-100 hover:border-gray-200'
-                      }`}
+                      className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedShipping?.name === opt.name && selectedShipping?.service === opt.service
+                        ? 'border-[#ea8b3a] bg-orange-50/30'
+                        : 'border-gray-100 hover:border-gray-200'
+                        }`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          selectedShipping?.name === opt.name && selectedShipping?.service === opt.service ? 'border-[#ea8b3a]' : 'border-gray-300'
-                        }`}>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedShipping?.name === opt.name && selectedShipping?.service === opt.service ? 'border-[#ea8b3a]' : 'border-gray-300'
+                          }`}>
                           {selectedShipping?.name === opt.name && selectedShipping?.service === opt.service && (
                             <div className="w-2.5 h-2.5 rounded-full bg-[#ea8b3a]" />
                           )}
@@ -289,22 +294,6 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* ─── Metode Pembayaran ─── */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#ea8b3a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                Metode Pembayaran
-              </h2>
-              <div className="p-4 border-2 border-[#ea8b3a] rounded-xl bg-orange-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full bg-[#ea8b3a]" />
-                  <span className="font-bold">Transfer Bank (Manual)</span>
-                </div>
-                <p className="text-sm text-gray-600 mt-2 ml-7">
-                  Instruksi transfer dan rekening akan diberikan setelah pesanan dibuat.
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* ─── Ringkasan Pesanan ─── */}
@@ -358,7 +347,7 @@ export default function CheckoutPage() {
                 disabled={processing || !selectedAddress || !selectedShipping}
                 className="w-full py-4 bg-[#ea8b3a] text-white font-bold text-lg rounded-xl hover:bg-[#dc7030] hover:shadow-lg hover:shadow-orange-200 transition-all disabled:opacity-50 disabled:hover:shadow-none active:scale-[0.98]"
               >
-                {processing ? "Memproses Pesanan..." : "Buat Pesanan Sekarang"}
+                {processing ? "Memproses Pesanan..." : "Pilih Metode Pembayaran"}
               </button>
             </div>
           </div>

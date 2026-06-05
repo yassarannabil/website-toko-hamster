@@ -42,16 +42,16 @@ interface OrderData {
   created_at: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
-  PENDING: { label: "Menunggu Pembayaran", color: "#e67e22", bgColor: "#fef3e2", icon: "⏳" },
-  "BELUM LUNAS": { label: "Belum Lunas", color: "#e74c3c", bgColor: "#fde8e8", icon: "⚠️" },
-  DP: { label: "DP", color: "#f39c12", bgColor: "#fef9e7", icon: "💰" },
-  LUNAS: { label: "Lunas", color: "#27ae60", bgColor: "#e8f8f0", icon: "✅" },
-  DIKIRIM: { label: "Sedang Dikirim", color: "#3498db", bgColor: "#ebf5fb", icon: "🚚" },
-  SAMPAI: { label: "Pesanan Selesai", color: "#2ecc71", bgColor: "#e8f8f0", icon: "📦" },
-  CANCELLED: { label: "Dibatalkan", color: "#95a5a6", bgColor: "#f2f3f4", icon: "❌" },
-  GARANSI: { label: "Garansi", color: "#e74c3c", bgColor: "#fde8e8", icon: "🔄" },
-  REFUNDED: { label: "Refunded", color: "#8e44ad", bgColor: "#f4ecf7", icon: "💸" },
+const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  PENDING: { label: "Menunggu Pembayaran", color: "#e67e22", bgColor: "#fef3e2" },
+  "BELUM LUNAS": { label: "Belum Lunas", color: "#e74c3c", bgColor: "#fde8e8" },
+  DP: { label: "DP", color: "#f39c12", bgColor: "#fef9e7" },
+  LUNAS: { label: "Lunas", color: "#27ae60", bgColor: "#e8f8f0" },
+  DIKIRIM: { label: "Sedang Dikirim", color: "#3498db", bgColor: "#ebf5fb" },
+  SAMPAI: { label: "Pesanan Selesai", color: "#2ecc71", bgColor: "#e8f8f0" },
+  CANCELLED: { label: "Dibatalkan", color: "#95a5a6", bgColor: "#f2f3f4" },
+  GARANSI: { label: "Garansi", color: "#e74c3c", bgColor: "#fde8e8" },
+  REFUNDED: { label: "Refunded", color: "#8e44ad", bgColor: "#f4ecf7" },
 };
 
 const TAB_FILTERS = [
@@ -109,8 +109,8 @@ export default function OrdersPage() {
     fetchOrders();
   }, [router, fetchOrders]);
 
-  const filteredOrders = activeTab === "all" 
-    ? orders 
+  const filteredOrders = activeTab === "all"
+    ? orders
     : orders.filter((o) => o.status === activeTab);
 
   const handlePayNow = (paymentUrl: string) => {
@@ -145,9 +145,6 @@ export default function OrdersPage() {
             gap: "0.75rem",
           }}
         >
-          <button onClick={() => router.back()} style={{ fontSize: "1.25rem", background: "none", border: "none", cursor: "pointer" }}>
-            ←
-          </button>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#1a1614", margin: 0 }}>Pesanan Saya</h1>
         </div>
       </header>
@@ -305,7 +302,7 @@ export default function OrdersPage() {
                             borderRadius: "999px",
                           }}
                         >
-                          {statusCfg.icon} {statusCfg.label}
+                          {statusCfg.label}
                         </span>
                       </div>
                       <span style={{ fontSize: "0.75rem", color: "#aaa" }}>{formatDate(order.created_at)}</span>
@@ -480,7 +477,7 @@ export default function OrdersPage() {
                             onMouseDown={(e) => ((e.target as HTMLElement).style.transform = "scale(0.97)")}
                             onMouseUp={(e) => ((e.target as HTMLElement).style.transform = "scale(1)")}
                           >
-                            💳 Bayar Sekarang
+                            Bayar Sekarang
                           </button>
                         )}
                         <Link
@@ -497,7 +494,7 @@ export default function OrdersPage() {
                             textAlign: "center",
                           }}
                         >
-                          💬 Chat Admin
+                          Chat Admin
                         </Link>
                       </div>
                     </div>
