@@ -237,7 +237,7 @@ class MasterCourierAdmin(admin.ModelAdmin):
 # ══════════════════════════════════════════════
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ["transaction_id", "customer_wa", "status_pembayaran", "total_bayar_formatted", "tanggal_kirim", "alamat_status", "created_at", "link_form_alamat"]
+    list_display = ["transaction_id", "customer_wa", "status_pembayaran", "total_bayar_formatted", "tanggal_kirim", "alamat_status", "created_at"]
     list_editable = ["tanggal_kirim"]
     list_filter = ["status_pembayaran", "alamat_lengkap"]
     search_fields = ["customer__nomor_wa", "raw_rekapan"]
@@ -272,10 +272,7 @@ class TransactionAdmin(admin.ModelAdmin):
             return mark_safe('<span style="color:#22c55e;font-weight:bold;">✅ Lengkap</span>')
         return mark_safe('<span style="color:#ef4444;font-weight:bold;">⏳ Belum Diisi</span>')
 
-    @admin.display(description="Link Pengisian")
-    def link_form_alamat(self, obj):
-        link = f"https://noska-hamster.shop/isi-alamat/{obj.token_alamat}"
-        return format_html('<input type="text" value="{}" readonly style="width:200px; padding:4px;" onclick="this.select(); document.execCommand(\\\'copy\\\'); alert(\\\'Link Copied!\\\');" />', link)
+
 
     def get_readonly_fields(self, request, obj=None):
         if obj: # editing an existing object

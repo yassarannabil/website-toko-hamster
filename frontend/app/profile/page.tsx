@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getToken, removeToken, isAuthenticated } from "../utils/auth";
 import { API_BASE_URL } from "../data/hamsters";
 import AddressModal, { SavedAddress } from "../components/AddressModal";
+import PageHeader from "../components/PageHeader";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -51,8 +52,9 @@ export default function ProfilePage() {
   if (loading) return <div className="flex h-[50vh] items-center justify-center">Memuat...</div>;
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-extrabold text-[#1a1614] mb-8">Profil Saya</h1>
+    <div className="min-h-screen bg-[#fdfcfb] flex flex-col">
+      <PageHeader title="Profil Saya" />
+      <div className="flex-grow max-w-xl w-full mx-auto px-4 py-8">
 
       {profile && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
@@ -116,6 +118,7 @@ export default function ProfilePage() {
           setShowAddressModal(false);
         }}
       />
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Footer from "../components/Footer";
+import PageHeader from "../components/PageHeader";
 import type { BoxItem, PaginatedResponse } from "../data/hamsters";
 import { API_BASE_URL } from "../data/hamsters";
 
@@ -24,30 +25,10 @@ export default async function KatalogPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      {/* ───── Header ───── */}
-      <header className="relative overflow-hidden bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600">
-        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" />
-
-        <div className="relative mx-auto max-w-5xl px-4 py-10 sm:py-14">
-          <div className="text-center">
-            <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl lg:text-4xl">
-              Katalog Live
-            </h1>
-            <p className="mx-auto mt-2 max-w-md text-sm text-brand-100/80 sm:text-base">
-              Pilih box untuk melihat koleksi hamster di dalamnya
-            </p>
-          </div>
-        </div>
-
-        <svg
-          className="absolute bottom-0 left-0 w-full text-surface"
-          viewBox="0 0 1440 60"
-          preserveAspectRatio="none"
-          fill="currentColor"
-        >
-          <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,60 L0,60 Z" />
-        </svg>
-      </header>
+      <PageHeader 
+        title="Katalog Live" 
+        subtitle="Pilih box untuk melihat koleksi hamster di dalamnya" 
+      />
 
       {/* ───── Box Grid ───── */}
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:py-12">

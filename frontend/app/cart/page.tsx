@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken, isAuthenticated } from "../utils/auth";
 import { API_BASE_URL } from "../data/hamsters";
+import HamsterImage from "../components/HamsterImage";
 import Footer from "../components/Footer";
+import PageHeader from "../components/PageHeader";
 
 interface CartItem {
   cart_item_id: number;
@@ -76,8 +78,8 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-[#fdfcfb] flex flex-col">
+      <PageHeader title="Keranjang Belanja" />
       <main className="flex-grow container mx-auto px-4 py-8 max-w-4xl">
-        <h1 className="text-3xl font-extrabold text-[#1a1614] mb-8">Keranjang Belanja</h1>
 
         {error ? (
           <div className="bg-red-50 text-red-600 p-4 rounded-xl">{error}</div>
@@ -93,12 +95,12 @@ export default function CartPage() {
             <div className="md:col-span-2 space-y-4">
               {items.map((item) => (
                 <div key={item.cart_item_id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
-                  <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
-                    {item.foto_preview ? (
-                      <img src={item.foto_preview} alt={item.kode_hamster} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No Image</div>
-                    )}
+                  <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden relative">
+                    <HamsterImage 
+                      src={item.foto_preview} 
+                      alt={item.kode_hamster || "Hamster"} 
+                      className="absolute inset-0 w-full h-full object-cover" 
+                    />
                   </div>
                   <div className="flex-grow flex flex-col justify-between">
                     <div>

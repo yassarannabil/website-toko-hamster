@@ -20,15 +20,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, re_path, include
 from django.views.generic import RedirectView
-from core.views import AddressFormView
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),
-    
-    # Form Alamat (Dirender oleh Django, konten oleh Next.js)
-    re_path(r'^isi-alamat/.*$', AddressFormView.as_view(), name='address_form_view'),
 ]
 
 # Serve media files during development

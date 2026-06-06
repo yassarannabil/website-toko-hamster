@@ -16,7 +16,6 @@ class TransactionDashboardSerializer(serializers.ModelSerializer):
     alamat_lengkap = serializers.SerializerMethodField()
     alamat_data = serializers.SerializerMethodField()
     hamsters_list = serializers.SerializerMethodField()
-    link_alamat = serializers.SerializerMethodField()
     qty_packing = serializers.SerializerMethodField()
 
     class Meta:
@@ -24,7 +23,7 @@ class TransactionDashboardSerializer(serializers.ModelSerializer):
         fields = [
             'transaction_id', 'nomor_wa', 'nama_customer', 'status_pembayaran', 'total_bayar', 'nominal_dp',
             'nominal_refund', 'nomor_resi', 'created_at', 'alamat_lengkap', 'alamat_data', 'hamsters_list', 
-            'link_alamat', 'keterangan_kurir', 'tanggal_kirim', 'hamsters_mati', 'alasan_batal', 'sudah_video_packing',
+            'keterangan_kurir', 'tanggal_kirim', 'hamsters_mati', 'alasan_batal', 'sudah_video_packing',
             'qty_packing'
         ]
 
@@ -61,12 +60,6 @@ class TransactionDashboardSerializer(serializers.ModelSerializer):
             } 
             for h in obj.hamsters.all()
         ]
-
-    def get_link_alamat(self, obj):
-        from django.conf import settings
-        # Use the public domain in production, or localhost:3000 (Next.js) in dev
-        base = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-        return f"{base}/isi-alamat/{obj.token_alamat}/"
 
     def get_qty_packing(self, obj):
         return obj.biaya_packing // 10000 if obj.biaya_packing else 0

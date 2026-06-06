@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { isAuthenticated, getToken } from "../utils/auth";
 import Footer from "../components/Footer";
+import PageHeader from "../components/PageHeader";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
@@ -124,36 +125,13 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#fdfcfb] flex flex-col">
-      {/* Header */}
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          background: "rgba(255,255,255,0.85)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid #f0ece8",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "56rem",
-            margin: "0 auto",
-            padding: "1rem 1.25rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-          }}
-        >
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#1a1614", margin: 0 }}>Pesanan Saya</h1>
-        </div>
-      </header>
+      <PageHeader title="Pesanan Saya" />
 
       {/* Tab Filters */}
       <div
         style={{
           position: "sticky",
-          top: "57px",
+          top: 0,
           zIndex: 40,
           background: "#fff",
           borderBottom: "1px solid #f0ece8",

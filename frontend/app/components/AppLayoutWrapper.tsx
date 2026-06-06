@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ReactNode } from "react";
+import { IconKatalog, IconKeranjang, IconPesanan, IconChat, IconSaya } from "./NavIcons";
 
 export default function AppLayoutWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -17,11 +18,11 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
   }
 
   const navItems = [
-    { name: "Katalog", path: "/katalog", icon: "🐹" },
-    { name: "Keranjang", path: "/cart", icon: "🛒" },
-    { name: "Pesanan", path: "/orders", icon: "📦" },
-    { name: "Chat", path: "/chat", icon: "💬" },
-    { name: "Saya", path: "/profile", icon: "👤" }
+    { name: "Katalog", path: "/katalog", icon: <IconKatalog className="w-6 h-6 sm:w-5 sm:h-5" /> },
+    { name: "Keranjang", path: "/cart", icon: <IconKeranjang className="w-6 h-6 sm:w-5 sm:h-5" /> },
+    { name: "Pesanan", path: "/orders", icon: <IconPesanan className="w-6 h-6 sm:w-5 sm:h-5" /> },
+    { name: "Chat", path: "/chat", icon: <IconChat className="w-6 h-6 sm:w-5 sm:h-5" /> },
+    { name: "Saya", path: "/profile", icon: <IconSaya className="w-6 h-6 sm:w-5 sm:h-5" /> }
   ];
 
   return (
@@ -50,7 +51,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                     : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                <span>{item.icon}</span>
+                <span className="flex items-center justify-center">{item.icon}</span>
                 {item.name}
               </Link>
             ))}
@@ -80,7 +81,7 @@ export default function AppLayoutWrapper({ children }: { children: ReactNode }) 
                   isActive ? "text-brand-600 scale-105" : "text-gray-400 hover:text-gray-600"
                 }`}
               >
-                <span className="text-2xl drop-shadow-sm">{item.icon}</span>
+                <span className="flex items-center justify-center drop-shadow-sm mb-0.5">{item.icon}</span>
                 <span className={`text-[10px] font-bold ${isActive ? "text-brand-600" : "font-semibold"}`}>
                   {item.name}
                 </span>

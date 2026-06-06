@@ -6,6 +6,8 @@ import { getToken, isAuthenticated } from "../utils/auth";
 import { API_BASE_URL } from "../data/hamsters";
 import Footer from "../components/Footer";
 import AddressModal, { SavedAddress } from "../components/AddressModal";
+import HamsterImage from "../components/HamsterImage";
+import PageHeader from "../components/PageHeader";
 
 interface ShippingService {
   name: string;
@@ -171,15 +173,8 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-[#fdfcfb] flex flex-col">
+      <PageHeader title="Checkout" backButton />
       <main className="flex-grow container mx-auto px-4 py-8 max-w-5xl">
-        <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-3xl font-extrabold text-[#1a1614]">Checkout</h1>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7 space-y-6">
@@ -304,12 +299,12 @@ export default function CheckoutPage() {
                 {cart?.items.map((item: any) => (
                   <div key={item.cart_item_id} className="flex justify-between items-center text-sm border-b border-gray-50 pb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                        {item.foto_preview ? (
-                          <img src={item.foto_preview} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xl">🐹</div>
-                        )}
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+                        <HamsterImage 
+                          src={item.foto_preview} 
+                          alt={item.varian || "Hamster"} 
+                          className="absolute inset-0 w-full h-full object-cover" 
+                        />
                       </div>
                       <div>
                         <div className="text-gray-900 font-bold line-clamp-1">{item.varian}</div>

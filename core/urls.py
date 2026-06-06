@@ -4,7 +4,7 @@ Noska Hamster — Core App URL Configuration
 """
 
 from django.urls import path, re_path
-from .views import BoxListView, BoxDetailView, AddressFormView
+from .views import BoxListView, BoxDetailView
 from .api_dashboard import (
     DashboardInventoryAPIView, DashboardCouriersAPIView, 
     DashboardCreateInvoiceAPIView, DashboardTransactionAPIView,
@@ -81,11 +81,6 @@ urlpatterns = [
     path("dashboard/inventory/<int:pk>/upload/", DashboardUploadMediaAPIView.as_view(), name="api_dashboard_inventory_upload"),
     path("dashboard/chat/rooms/", DashboardChatRoomsAPIView.as_view(), name="api_dashboard_chat_rooms"),
     path("dashboard/chat/rooms/<int:room_id>/messages/", DashboardChatMessagesAPIView.as_view(), name="api_dashboard_chat_messages"),
-
-    # ----------------------------------------------------
-    # Public API (Form Alamat Customer)
-    # ----------------------------------------------------
-    path("transaksi/alamat/<uuid:token>/", AddressFormView.as_view(), name="api_address_form"),
 
     # ----------------------------------------------------
     # Public API (Cek Ongkir — BinderByte)

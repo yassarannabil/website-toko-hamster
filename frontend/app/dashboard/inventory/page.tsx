@@ -163,7 +163,7 @@ function InventoryContent() {
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Stok Live</h2>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Stok Live</h1>
           {selectedSession ? (
             <p className="text-gray-500 mt-2 text-sm font-medium flex items-center gap-2">
               <button onClick={handleBackToSessions} className="text-orange-600 hover:underline">Daftar Sesi</button>

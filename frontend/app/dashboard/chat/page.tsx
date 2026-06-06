@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "../../data/hamsters";
+import HamsterImage from "../../components/HamsterImage";
 import Link from "next/link";
 
 interface Room {
@@ -110,31 +111,28 @@ export default function AdminChatDashboard() {
   };
 
   const renderProductCard = (inv: any) => (
-    <div className="bg-white border border-gray-100 rounded-xl p-3 flex gap-3 shadow-sm mb-2 max-w-sm w-full cursor-pointer hover:bg-gray-50 transition-colors">
-      <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-        {inv.foto_preview ? (
-          <img src={inv.foto_preview} alt={inv.varian} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">🐹</div>
-        )}
+    <div className="bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-3 shadow-sm mb-2 w-[260px] sm:w-[280px] cursor-pointer hover:bg-gray-50 transition-colors">
+      <div className="w-14 h-14 min-w-[56px] min-h-[56px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+        <HamsterImage 
+          src={inv.foto_preview} 
+          alt={inv.varian} 
+          className="absolute inset-0 w-full h-full object-cover" 
+        />
       </div>
-      <div className="flex flex-col justify-center text-left text-gray-800">
-        <span className="text-[10px] font-bold text-brand-500">{inv.kode_hamster}</span>
-        <span className="text-sm font-bold line-clamp-1">{inv.varian}</span>
+      <div className="flex flex-col justify-center text-left text-gray-800 min-w-0 flex-1">
+        <span className="text-[10px] font-bold text-brand-500 truncate">{inv.kode_hamster}</span>
+        <span className="text-sm font-bold truncate">{inv.varian}</span>
         <span className="text-xs font-bold text-gray-500 mt-0.5">{formatRupiah(inv.harga)}</span>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-[calc(100dvh-100px)] sm:h-[calc(100dvh-116px)] md:h-[calc(100dvh-64px)] bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Sidebar List Chat */}
       <aside className="w-80 border-r border-gray-100 flex flex-col bg-[#fdfcfb]">
-        <div className="p-4 border-b border-gray-100">
-          <Link href="/dashboard" className="text-sm font-semibold text-gray-500 hover:text-gray-800 flex items-center gap-2 mb-4">
-            <span>←</span> Kembali ke Dashboard
-          </Link>
-          <h2 className="text-xl font-bold text-gray-800">Pesan Pelanggan</h2>
+        <div className="p-4 border-b border-gray-100 flex items-center h-[76px]">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Pesan Pelanggan</h1>
         </div>
         
         <div className="flex-1 overflow-y-auto">
@@ -173,8 +171,17 @@ export default function AdminChatDashboard() {
       <main className="flex-1 flex flex-col bg-gray-50/50">
         {activeRoom ? (
           <>
-            <header className="bg-white p-4 border-b border-gray-100 flex items-center shadow-sm">
-              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold mr-3">
+            <header className="bg-white p-4 border-b border-gray-100 flex items-center shadow-sm h-[76px]">
+              <button 
+                onClick={() => setActiveRoom(null)}
+                className="mr-3 p-2 -ml-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                title="Tutup Obrolan"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold mr-3 flex-shrink-0">
                 {activeRoom.customer_name.charAt(0).toUpperCase()}
               </div>
               <h2 className="font-bold text-lg text-gray-800">{activeRoom.customer_name}</h2>

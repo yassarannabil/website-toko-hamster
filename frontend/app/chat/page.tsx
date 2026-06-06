@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getToken, isAuthenticated } from "../utils/auth";
-import { API_BASE_URL } from "../data/hamsters";
+import { API_BASE_URL, getRelativeMediaUrl } from "../data/hamsters";
+import HamsterImage from "../components/HamsterImage";
 
 interface Message {
   id: number;
@@ -36,14 +37,38 @@ function ChatContent() {
   const [roomId, setRoomId] = useState<number | null>(null);
   const [relatedProduct, setRelatedProduct] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const prevMessagesLength = useRef(0);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const threshold = 150;
+    const position = container.scrollTop + container.clientHeight;
+    setIsNearBottom(position >= container.scrollHeight - threshold);
+  };
+
+  const scrollToBottom = (force = false) => {
+    if (force || isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ 
+        behavior: (force && initialLoad) ? "auto" : "smooth" 
+      });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0) {
+      if (initialLoad) {
+        setTimeout(() => scrollToBottom(true), 100);
+        setInitialLoad(false);
+      } else if (messages.length > prevMessagesLength.current) {
+        scrollToBottom();
+      }
+      prevMessagesLength.current = messages.length;
+    }
+  }, [messages, initialLoad, isNearBottom]);
 
   // Fetch product context if present in URL
   useEffect(() => {
@@ -123,6 +148,7 @@ function ChatContent() {
       });
       if (res.ok) {
         fetchMessages();
+        setTimeout(() => scrollToBottom(true), 100);
         // Remove query parameter
         router.replace("/chat", { scroll: false });
       }
@@ -132,25 +158,25 @@ function ChatContent() {
   };
 
   const renderProductCard = (inv: any) => (
-    <div className="bg-white border border-gray-100 rounded-xl p-3 flex gap-3 shadow-sm mb-2 max-w-sm w-full cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => router.push("/katalog")}>
-      <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-        {inv.foto_preview ? (
-          <img src={inv.foto_preview} alt={inv.varian} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">🐹</div>
-        )}
+    <div className="bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-3 shadow-sm mb-2 w-[260px] sm:w-[280px] cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => router.push("/katalog")}>
+      <div className="w-14 h-14 min-w-[56px] min-h-[56px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+        <HamsterImage 
+          src={inv.foto_preview} 
+          alt={inv.varian} 
+          className="absolute inset-0 w-full h-full object-cover" 
+        />
       </div>
-      <div className="flex flex-col justify-center text-left">
-        <span className="text-[10px] font-bold text-brand-500">{inv.kode_hamster}</span>
-        <span className="text-sm font-bold text-gray-800 line-clamp-1">{inv.varian}</span>
+      <div className="flex flex-col justify-center text-left min-w-0 flex-1">
+        <span className="text-[10px] font-bold text-brand-500 truncate">{inv.kode_hamster}</span>
+        <span className="text-sm font-bold text-gray-800 truncate">{inv.varian}</span>
         <span className="text-xs font-bold text-gray-500 mt-0.5">{formatRupiah(inv.harga)}</span>
       </div>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <header className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between shadow-sm z-10">
+    <div className="flex flex-col bg-gray-50 h-[calc(100dvh-72px)] md:h-[calc(100dvh-64px)]">
+      <header className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between shadow-sm z-10 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#ea8b3a] rounded-full flex items-center justify-center text-white font-bold text-xl shadow-sm">
             N
@@ -162,7 +188,11 @@ function ChatContent() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+      <main 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 max-w-4xl mx-auto w-full"
+      >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-400">
             <span className="text-4xl mb-3">💬</span>
@@ -199,7 +229,7 @@ function ChatContent() {
         <div ref={messagesEndRef} />
       </main>
 
-      <footer className="bg-white p-4 border-t border-gray-100 pb-8 md:pb-4 relative">
+      <footer className="bg-white p-4 border-t border-gray-100 shrink-0">
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex flex-col gap-2">
           {/* Product Preview before sending */}
           {relatedProduct && (

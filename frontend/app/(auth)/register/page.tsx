@@ -53,13 +53,13 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div>
           <h2 className="mt-2 text-center text-3xl font-extrabold text-[#1a1614]">
-            Buat Akun Baru ✨
+            Buat Akun Baru
           </h2>
           <p className="mt-2 text-center text-sm text-[#6b5e54]">
-            Bergabung dengan keluarga Noska Hamster
+            Daftar akun untuk belanja di Noska Hamster
           </p>
         </div>
-        
+
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100">
             {error}
@@ -80,7 +80,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#1a1614]">Email Address</label>
+              <label className="block text-sm font-medium text-[#1a1614]">Email</label>
               <input
                 type="email"
                 name="email"
@@ -102,7 +102,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#1a1614]">Password</label>
+              <label className="block text-sm font-medium text-[#1a1614]">Kata Sandi</label>
               <input
                 type="password"
                 name="password"

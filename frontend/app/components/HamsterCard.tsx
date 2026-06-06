@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { HamsterItem } from "../data/hamsters";
 import { getRelativeMediaUrl } from "../data/hamsters";
+import HamsterImage from "./HamsterImage";
 import Link from "next/link";
 
 function formatRupiah(n: number | string): string {
@@ -120,20 +121,12 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
         ) : (
           <>
             {/* Foto Preview */}
-            {item.foto_preview ? (
-              <img
-                src={getRelativeMediaUrl(item.foto_preview) || ""}
-                alt={`${item.varian} — ${displayId}`}
-                loading="lazy"
-                className={`absolute inset-0 h-full w-full object-contain bg-surface-muted transition-transform duration-500 ${(unavailable && !isAdminView) ? "" : "group-hover:scale-105"
-                  }`}
-              />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface-muted text-text-muted">
-                <span className="text-4xl">🐹</span>
-                <span className="text-xs font-medium">Belum ada foto</span>
-              </div>
-            )}
+            <HamsterImage
+              src={item.foto_preview}
+              alt={`${item.varian} — ${displayId}`}
+              className={`absolute inset-0 h-full w-full object-contain bg-surface-muted transition-transform duration-500 ${(unavailable && !isAdminView) ? "" : "group-hover:scale-105"
+                }`}
+            />
 
             {/* ▶ Play Button Overlay */}
             {hasVideo && !unavailable && !isAdminView && (

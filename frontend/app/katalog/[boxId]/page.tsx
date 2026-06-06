@@ -1,6 +1,7 @@
 import Link from "next/link";
 import HamsterCard from "../../components/HamsterCard";
 import Footer from "../../components/Footer";
+import PageHeader from "../../components/PageHeader";
 import type { HamsterItem, BoxItem, PaginatedResponse } from "../../data/hamsters";
 import { API_BASE_URL } from "../../data/hamsters";
 
@@ -46,45 +47,13 @@ export default async function BoxDetailPage({
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      {/* ───── Header ───── */}
-      <header className="relative overflow-hidden bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600">
-        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand-500/20 blur-3xl" />
-
-        <div className="relative mx-auto max-w-5xl px-4 py-10 sm:py-14">
-          {/* Back */}
-          <Link
-            href="/katalog"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-white/70 transition-colors hover:text-white mb-6"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Kembali ke Katalog
-          </Link>
-
-          <div className="text-center">
-            <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              {boxInfo?.nama_box?.toLowerCase() === "aksesoris" || boxInfo?.spesies === "Perlengkapan" 
+      <PageHeader 
+        title={boxInfo?.nama_box?.toLowerCase() === "aksesoris" || boxInfo?.spesies === "Perlengkapan" 
                 ? boxInfo.nama_box 
                 : `Box ${boxInfo?.nama_box || boxId}`}
-            </h1>
-            {boxInfo?.kategori && (
-              <p className="mx-auto mt-2 text-sm text-brand-100/80 sm:text-base">
-                {boxInfo.kategori}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <svg
-          className="absolute bottom-0 left-0 w-full text-surface"
-          viewBox="0 0 1440 60"
-          preserveAspectRatio="none"
-          fill="currentColor"
-        >
-          <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,60 L0,60 Z" />
-        </svg>
-      </header>
+        subtitle={boxInfo?.kategori || undefined}
+        backButton
+      />
 
       {/* ───── Hamster Grid ───── */}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:py-12">

@@ -55,7 +55,7 @@ export default function TransactionsPage() {
   };
 
   const getStatusBadge = (trx: any) => {
-    if (trx.status_pembayaran === 'LUNAS' && trx.alamat_lengkap && !trx.nomor_resi) {
+    if (trx.status_pembayaran === 'LUNAS' && !trx.nomor_resi) {
       if (!trx.tanggal_kirim) {
         if (!trx.sudah_video_packing) {
           return { text: 'TUNDA', className: 'bg-red-50 text-red-600 border-red-100' };
@@ -122,9 +122,6 @@ export default function TransactionsPage() {
     }
     return "siap-packing"; // Default ke Siap Packing agar fokus kerja
   });
-
-  // State untuk Modal Minta Alamat
-  const [addressModal, setAddressModal] = useState<any | null>(null);
 
   // State untuk Modal Konfirmasi Sampai
   const [arrivalModal, setArrivalModal] = useState<any | null>(null);
@@ -394,9 +391,8 @@ export default function TransactionsPage() {
   const filteredTransactions = transactions.filter(trx => {
 
     if (activeTab === 'menunggu') return ['PENDING', 'BELUM LUNAS', 'DP'].includes(trx.status_pembayaran);
-    if (activeTab === 'alamat') return trx.status_pembayaran === 'LUNAS' && !trx.alamat_lengkap;
-    if (activeTab === 'siap-packing') return trx.status_pembayaran === 'LUNAS' && trx.alamat_lengkap && !trx.sudah_video_packing;
-    if (activeTab === 'siap-kirim') return trx.status_pembayaran === 'LUNAS' && trx.alamat_lengkap && trx.sudah_video_packing && !trx.nomor_resi;
+    if (activeTab === 'siap-packing') return trx.status_pembayaran === 'LUNAS' && !trx.sudah_video_packing;
+    if (activeTab === 'siap-kirim') return trx.status_pembayaran === 'LUNAS' && trx.sudah_video_packing && !trx.nomor_resi;
     if (activeTab === 'dikirim') return trx.status_pembayaran === 'DIKIRIM';
     if (activeTab === 'garansi') return trx.status_pembayaran === 'GARANSI';
     if (activeTab === 'selesai') return ['SAMPAI', 'REFUNDED'].includes(trx.status_pembayaran);
@@ -407,9 +403,8 @@ export default function TransactionsPage() {
   const getCount = (tab: string) => {
 
     if (tab === 'menunggu') return transactions.filter(t => ['PENDING', 'BELUM LUNAS', 'DP'].includes(t.status_pembayaran)).length;
-    if (tab === 'alamat') return transactions.filter(t => t.status_pembayaran === 'LUNAS' && !t.alamat_lengkap).length;
-    if (tab === 'siap-packing') return transactions.filter(t => t.status_pembayaran === 'LUNAS' && t.alamat_lengkap && !t.sudah_video_packing).length;
-    if (tab === 'siap-kirim') return transactions.filter(t => t.status_pembayaran === 'LUNAS' && t.alamat_lengkap && t.sudah_video_packing && !t.nomor_resi).length;
+    if (tab === 'siap-packing') return transactions.filter(t => t.status_pembayaran === 'LUNAS' && !t.sudah_video_packing).length;
+    if (tab === 'siap-kirim') return transactions.filter(t => t.status_pembayaran === 'LUNAS' && t.sudah_video_packing && !t.nomor_resi).length;
     if (tab === 'dikirim') return transactions.filter(t => t.status_pembayaran === 'DIKIRIM').length;
     if (tab === 'garansi') return transactions.filter(t => t.status_pembayaran === 'GARANSI').length;
     if (tab === 'selesai') return transactions.filter(t => ['SAMPAI', 'REFUNDED'].includes(t.status_pembayaran)).length;
@@ -440,7 +435,7 @@ export default function TransactionsPage() {
 
   const downloadAllResiPDF = (size: '100x150' | '78x100') => {
     const siapPackingTrxs = transactions.filter(trx => {
-      const isSiapPackingTab = trx.status_pembayaran === 'LUNAS' && trx.alamat_lengkap && !trx.sudah_video_packing;
+      const isSiapPackingTab = trx.status_pembayaran === 'LUNAS' && !trx.sudah_video_packing;
       if (!isSiapPackingTab) return false;
       const badge = getStatusBadge(trx);
       return badge.text === 'SIAP PACKING';
@@ -1176,7 +1171,7 @@ export default function TransactionsPage() {
       )}
 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Manajemen Pesanan</h2>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Manajemen Pesanan</h1>
         <div className="flex gap-3 sm:gap-6 items-center">
           <div className="text-right hidden md:block border-r border-gray-200 pr-6">
             <div className="text-[11px] font-bold text-gray-500 uppercase tracking-widest leading-tight">
@@ -1238,7 +1233,6 @@ export default function TransactionsPage() {
         <div className="flex flex-nowrap gap-2 bg-gray-100/50 p-1.5 rounded-2xl border border-gray-200 w-max">
           {[
             { id: 'menunggu', label: 'Menunggu Bayar', color: 'orange' },
-            { id: 'alamat', label: 'Lengkapi Alamat', color: 'brand' },
             { id: 'siap-packing', label: 'Siap Packing', color: 'yellow' },
             { id: 'siap-kirim', label: 'Siap Kirim', color: 'blue' },
             { id: 'dikirim', label: 'Dalam Perjalanan', color: 'orange' },
@@ -1916,17 +1910,7 @@ export default function TransactionsPage() {
                   </button>
                 </div>
               ) : (
-                /* ─── Normal Mode Footer ─── */
                 <div className="flex flex-wrap gap-2 justify-end">
-                {selectedTrxDetail.status_pembayaran === 'LUNAS' && !selectedTrxDetail.alamat_lengkap && (
-                  <button
-                    onClick={() => setAddressModal(selectedTrxDetail)}
-                    className="bg-amber-900 text-white px-4 py-2.5 rounded-xl hover:bg-amber-950 shadow-sm transition text-xs font-bold uppercase tracking-wider"
-                    title="Minta Alamat"
-                  >
-                    Minta Alamat
-                  </button>
-                )}
                 {['LUNAS', 'DP'].includes(selectedTrxDetail.status_pembayaran) && selectedTrxDetail.alamat_lengkap && !selectedTrxDetail.nomor_resi && (
                   <>
                     {activeTab === 'siap-packing' && (
@@ -2204,78 +2188,6 @@ export default function TransactionsPage() {
         </div>
         );
       })()}
-      {/* Modal Minta Alamat */}
-      {addressModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-brand-100">
-                📍
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">Minta Alamat</h3>
-              <p className="text-gray-500 text-sm mb-6">Pilih metode untuk meminta alamat ke <span className="font-bold text-gray-800">#{addressModal.transaction_id}</span></p>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(addressModal.link_alamat);
-                    alert('Link alamat berhasil disalin!');
-                    setAddressModal(null);
-                  }}
-                  className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">🔗</span>
-                    <div className="text-left">
-                      <div className="font-bold text-gray-800 text-sm uppercase">Salin Link</div>
-                      <div className="text-[10px] text-gray-500">Copy link untuk dikirim manual</div>
-                    </div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-
-                <button
-                  onClick={() => {
-                    let phone = addressModal.nomor_wa.replace(/\D/g, '');
-                    if (phone.startsWith('0')) {
-                      phone = '62' + phone.substring(1);
-                    }
-                    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(
-                      `Mohon dibantu pengisian alamat pengirimannya melalui link berikut ya kak:\n${addressModal.link_alamat} `
-                    )}`;
-                    window.open(waUrl, '_blank');
-                    setAddressModal(null);
-                  }}
-                  className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-green-50 hover:bg-green-100 rounded-2xl border border-green-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-green-600 text-xl">
-                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.653a11.888 11.888 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                      </svg>
-                    </span>
-                    <div className="text-left">
-                      <div className="font-bold text-green-700 text-sm uppercase">Kirim ke WA</div>
-                      <div className="text-[10px] text-green-600">Buka WA dengan pesan otomatis</div>
-                    </div>
-                  </div>
-                  <svg className="w-5 h-5 text-green-300 group-hover:text-green-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <button
-              onClick={() => setAddressModal(null)}
-              className="w-full py-4 text-sm font-bold text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
-            >
-              Batal
-            </button>
-          </div>
-        </div>
-      )}
       {/* Modal Detail Alamat */}
       {viewAddressTrx && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
