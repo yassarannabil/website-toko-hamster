@@ -1,6 +1,7 @@
 import hmac
 import hashlib
 import base64
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -29,55 +30,62 @@ class DokuNotificationAPIView(APIView):
             
         # Validate Signature
         target_path = request.path # Usually "/api/payment/doku-notify/"
+        secret_key = settings.DOKU_SECRET_KEY
         
-        # VERY IMPORTANT: For webhooks, we MUST hash the raw request body bytes precisely as received!
-        # Do NOT re-minify `request.data` because key orders or float formatting might differ.
         raw_body = request.body
-        digest = base64.b64encode(hashlib.sha256(raw_body).digest()).decode('utf-8')
+        digest_raw = base64.b64encode(hashlib.sha256(raw_body).digest()).decode('utf-8')
         
-        components = (
+        components_raw = (
             f"Client-Id:{client_id}\n"
             f"Request-Id:{request_id}\n"
             f"Request-Timestamp:{request_timestamp}\n"
             f"Request-Target:{target_path}\n"
-            f"Digest:{digest}"
+            f"Digest:{digest_raw}"
         )
+        expected_signature_raw = "HMACSHA256=" + base64.b64encode(hmac.new(secret_key.encode('utf-8'), components_raw.encode('utf-8'), hashlib.sha256).digest()).decode('utf-8')
         
-        secret_key = settings.DOKU_SECRET_KEY
-        expected_signature_bytes = hmac.new(
-            secret_key.encode('utf-8'),
-            components.encode('utf-8'),
-            hashlib.sha256
-        ).digest()
+        # Test Minified Body as well
+        body_minified = json.dumps(request.data, separators=(',', ':'))
+        digest_minified = base64.b64encode(hashlib.sha256(body_minified.encode('utf-8')).digest()).decode('utf-8')
+        components_minified = (
+            f"Client-Id:{client_id}\n"
+            f"Request-Id:{request_id}\n"
+            f"Request-Timestamp:{request_timestamp}\n"
+            f"Request-Target:{target_path}\n"
+            f"Digest:{digest_minified}"
+        )
+        expected_signature_min = "HMACSHA256=" + base64.b64encode(hmac.new(secret_key.encode('utf-8'), components_minified.encode('utf-8'), hashlib.sha256).digest()).decode('utf-8')
+
+        print(f"--- DOKU WEBHOOK DEBUG ---", flush=True)
+        print(f"Headers Signature: {signature_header}", flush=True)
+        print(f"Expected Raw: {expected_signature_raw}", flush=True)
+        print(f"Expected Minified: {expected_signature_min}", flush=True)
+        print(f"Target Path: {target_path}", flush=True)
+        print(f"Raw Body: {raw_body}", flush=True)
+        print(f"Minified Body: {body_minified}", flush=True)
+        print(f"--------------------------", flush=True)
         
-        expected_signature = "HMACSHA256=" + base64.b64encode(expected_signature_bytes).decode('utf-8')
-        
-        if not hmac.compare_digest(expected_signature, signature_header):
-            print(f"Signature mismatch. Expected: {expected_signature}, Got: {signature_header}", flush=True)
-            return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
-            
-        # Process the payload
-        try:
-            transaction_status = body_dict.get('transaction', {}).get('status', '').upper()
-            invoice_number = body_dict.get('order', {}).get('invoice_number', '')
-            
-            if invoice_number.startswith("INV-"):
-                transaction_id = invoice_number.replace("INV-", "")
-                trx = Transaction.objects.filter(transaction_id=transaction_id).first()
+        if hmac.compare_digest(expected_signature_raw, signature_header) or hmac.compare_digest(expected_signature_min, signature_header):
+            print("Signature matches!", flush=True)
+            # Proceed with processing
+            try:
+                transaction_status = request.data.get('transaction', {}).get('status', '').upper()
+                invoice_number = request.data.get('order', {}).get('invoice_number', '')
                 
-                if trx:
-                    if transaction_status == "SUCCESS":
-                        trx.status_pembayaran = "LUNAS"
-                        # Extract payment method from payload if available
-                        channel = body_dict.get('payment', {}).get('type', '') or body_dict.get('channel', {}).get('id', '')
-                        if channel:
-                            trx.metode_pembayaran = f"DOKU - {channel}"
-                        trx.save()
-                    elif transaction_status == "FAILED":
-                        # Optional: Mark as cancelled or let user retry
-                        pass
-        except Exception as e:
-            print(f"Error processing DOKU webhook: {e}")
-            
-        # DOKU expects HTTP 200 OK
-        return Response({"message": "OK"}, status=status.HTTP_200_OK)
+                if invoice_number.startswith("INV-"):
+                    transaction_id = invoice_number.replace("INV-", "")
+                    trx = Transaction.objects.filter(transaction_id=transaction_id).first()
+                    
+                    if trx:
+                        if transaction_status == "SUCCESS":
+                            trx.status_pembayaran = "LUNAS"
+                            channel = request.data.get('payment', {}).get('type', '') or request.data.get('channel', {}).get('id', '')
+                            if channel:
+                                trx.metode_pembayaran = f"DOKU - {channel}"
+                            trx.save()
+            except Exception as e:
+                print(f"Error processing DOKU webhook: {e}")
+                
+            return Response({"message": "OK"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
