@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const PROXY_URL = "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -35,19 +35,15 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/media/:path*',
-        destination: `${API_URL}/media/:path*`
+        destination: `${PROXY_URL}/media/:path*`
       },
       {
         source: '/admin/:path*',
-        destination: `${API_URL}/admin/:path*`
+        destination: `${PROXY_URL}/admin/:path*`
       },
       {
         source: '/static/:path*',
-        destination: `${API_URL}/static/:path*`
-      },
-      {
-        source: '/api/:path*',
-        destination: `${API_URL}/api/:path*`
+        destination: `${PROXY_URL}/static/:path*`
       }
     ];
   }
