@@ -1,10 +1,11 @@
 import hmac
+import hashlib
+import base64
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from .models import Transaction
-from .doku_utils import generate_doku_signature
 
 class DokuNotificationAPIView(APIView):
     """
@@ -14,7 +15,7 @@ class DokuNotificationAPIView(APIView):
     permission_classes = []
 
     def post(self, request):
-        client_id = request.headers.get('Client-Id')
+        client_id = request.headers.get('Client-Id', '')
         request_id = request.headers.get('Request-Id')
         request_timestamp = request.headers.get('Request-Timestamp')
         signature_header = request.headers.get('Signature')
@@ -22,20 +23,37 @@ class DokuNotificationAPIView(APIView):
         if not all([client_id, request_id, request_timestamp, signature_header]):
             return Response({"error": "Missing headers"}, status=status.HTTP_400_BAD_REQUEST)
             
-        if client_id != settings.DOKU_CLIENT_ID:
+        if client_id.strip() != settings.DOKU_CLIENT_ID.strip():
+            print(f"Client ID mismatch. Expected: '{settings.DOKU_CLIENT_ID}', Got: '{client_id}'", flush=True)
             return Response({"error": "Invalid Client-Id"}, status=status.HTTP_401_UNAUTHORIZED)
             
         # Validate Signature
         target_path = request.path # Usually "/api/payment/doku-notify/"
-        # Re-generate signature from raw payload to match precisely
-        body_dict = request.data
+        
+        # VERY IMPORTANT: For webhooks, we MUST hash the raw request body bytes precisely as received!
+        # Do NOT re-minify `request.data` because key orders or float formatting might differ.
+        raw_body = request.body
+        digest = base64.b64encode(hashlib.sha256(raw_body).digest()).decode('utf-8')
+        
+        components = (
+            f"Client-Id:{client_id}\n"
+            f"Request-Id:{request_id}\n"
+            f"Request-Timestamp:{request_timestamp}\n"
+            f"Request-Target:{target_path}\n"
+            f"Digest:{digest}"
+        )
+        
         secret_key = settings.DOKU_SECRET_KEY
+        expected_signature_bytes = hmac.new(
+            secret_key.encode('utf-8'),
+            components.encode('utf-8'),
+            hashlib.sha256
+        ).digest()
         
-        expected_signature = generate_doku_signature(client_id, request_id, request_timestamp, target_path, body_dict, secret_key)
+        expected_signature = "HMACSHA256=" + base64.b64encode(expected_signature_bytes).decode('utf-8')
         
-        # hmac.compare_digest is safer against timing attacks
         if not hmac.compare_digest(expected_signature, signature_header):
-            print(f"Signature mismatch. Expected: {expected_signature}, Got: {signature_header}")
+            print(f"Signature mismatch. Expected: {expected_signature}, Got: {signature_header}", flush=True)
             return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
             
         # Process the payload
