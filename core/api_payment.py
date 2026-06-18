@@ -52,6 +52,9 @@ class DokuNotificationAPIView(APIView):
         if hmac.compare_digest(expected_signature, signature_header):
             # Proceed with processing
             try:
+                import datetime
+                import holidays
+                
                 transaction_status = request.data.get('transaction', {}).get('status', '').upper()
                 invoice_number = request.data.get('order', {}).get('invoice_number', '')
                 
@@ -65,6 +68,14 @@ class DokuNotificationAPIView(APIView):
                             channel = request.data.get('payment', {}).get('type', '') or request.data.get('channel', {}).get('id', '')
                             if channel:
                                 trx.metode_pembayaran = f"DOKU - {channel}"
+                                
+                            # Calculate Tanggal Kirim: H+1 skipping Sundays and ID public holidays
+                            id_holidays = holidays.ID()
+                            ship_date = datetime.date.today() + datetime.timedelta(days=1)
+                            while ship_date.weekday() == 6 or ship_date in id_holidays:
+                                ship_date += datetime.timedelta(days=1)
+                                
+                            trx.tanggal_kirim = ship_date
                             trx.save()
             except Exception as e:
                 print(f"Error processing DOKU webhook: {e}")
