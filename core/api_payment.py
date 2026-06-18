@@ -77,6 +77,16 @@ class DokuNotificationAPIView(APIView):
                                 
                             trx.tanggal_kirim = ship_date
                             trx.save()
+                        elif transaction_status in ["FAILED", "EXPIRED"]:
+                            trx.status_pembayaran = "CANCELLED"
+                            trx.alasan_batal = f"Dibatalkan otomatis oleh sistem DOKU (Status: {transaction_status})"
+                            trx.save()
+                            
+                            # Kembalikan status hamster menjadi TERSEDIA
+                            for hamster in trx.hamsters.all():
+                                if hamster.status_ketersediaan in ['Terjual', 'Hold']:
+                                    hamster.status_ketersediaan = 'Tersedia'
+                                    hamster.save()
             except Exception as e:
                 print(f"Error processing DOKU webhook: {e}")
                 

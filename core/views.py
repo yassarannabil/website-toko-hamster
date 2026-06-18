@@ -27,6 +27,29 @@ class BoxListView(ListAPIView):
     serializer_class = BoxSerializer
 
     def get_queryset(self):
+        # ---------------------------------------------------------------------
+        # LAZY EXPIRATION: Auto-cancel abandoned transactions older than 60 mins
+        # ---------------------------------------------------------------------
+        from django.utils import timezone
+        from datetime import timedelta
+        from django.db import transaction
+        
+        time_threshold = timezone.now() - timedelta(minutes=60)
+        expired_trx = Transaction.objects.filter(status_pembayaran='PENDING', created_at__lte=time_threshold)
+        
+        if expired_trx.exists():
+            for trx in expired_trx:
+                with transaction.atomic():
+                    trx.status_pembayaran = 'CANCELLED'
+                    trx.alasan_batal = 'Batas waktu pembayaran otomatis (60 menit) telah kedaluwarsa'
+                    trx.save()
+                    # Kembalikan hamster ke etalase
+                    for hamster in trx.hamsters.all():
+                        if hamster.status_ketersediaan in ['Terjual', 'Hold']:
+                            hamster.status_ketersediaan = 'Tersedia'
+                            hamster.save()
+        # ---------------------------------------------------------------------
+        
         return (
             Box.objects
             .filter(session__is_active=True)
