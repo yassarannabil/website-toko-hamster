@@ -24,18 +24,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-_7&v!j(qanh_v=6#a(g2(lc^c+olo2in=!h*+57gy-s-i-=%=u")
-
 # SECURITY WARNING: don't run with debug turned on in production!
-# Karena ini dijalankan lokal di Mac Anda, kita set ke True agar mudah lihat error
-DEBUG = True
+DEBUG = os.environ.get("ENVIRONMENT", "development") != "production"
 
-# Izinkan akses dari Ngrok
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", ".ngrok.app", ".ngrok-free.app", "*"]
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-_7&v!j(qanh_v=6#a(g2(lc^c+olo2in=!h*+57gy-s-i-=%=u" if DEBUG else "")
+
+# Production Host Configuration
+if DEBUG:
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", ".ngrok.app", ".ngrok-free.app", "*"]
+else:
+    # In production, only allow specifically defined hosts (e.g. your production domain)
+    allowed = os.environ.get("ALLOWED_HOSTS", "")
+    ALLOWED_HOSTS = [h.strip() for h in allowed.split(",")] if allowed else []
 
 # Percayai origin Ngrok untuk form submission (Django Admin)
 CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app", "https://*.ngrok.app"]
+if not DEBUG and os.environ.get("FRONTEND_URL"):
+    CSRF_TRUSTED_ORIGINS.append(os.environ.get("FRONTEND_URL"))
 
 
 # Application definition
@@ -96,10 +102,11 @@ WSGI_APPLICATION = "noska_hamster.wsgi.application"
 # Untuk development tanpa PostgreSQL, gunakan SQLite di bawah.
 # Kita kembali menggunakan SQLite karena data aman di Mac Anda.
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
+        conn_max_age=0,  # MUST BE 0 FOR SUPABASE SESSION POOLER!
+        ssl_require=True if "supabase" in os.environ.get("DATABASE_URL", "") else False
+    )
 }
 
 
@@ -186,8 +193,8 @@ KOMERCE_API_KEY = os.environ.get("KOMERCE_API_KEY", "")
 # ──────────────────────────────────────────────
 # DOKU Payment Gateway (Jokul Checkout)
 # ──────────────────────────────────────────────
-DOKU_CLIENT_ID = os.environ.get("DOKU_CLIENT_ID", "BRN-0239-1780472793618") # Default from docs
-DOKU_SECRET_KEY = os.environ.get("DOKU_SECRET_KEY", "SK-VNdsXpBdjM9UNfLbQOlI")
+DOKU_CLIENT_ID = os.environ.get("DOKU_CLIENT_ID", "") 
+DOKU_SECRET_KEY = os.environ.get("DOKU_SECRET_KEY", "")
 DOKU_BASE_URL = os.environ.get("DOKU_BASE_URL", "https://api-sandbox.doku.com")
 
 # ──────────────────────────────────────────────
@@ -203,10 +210,50 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle"
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/day",
+        "login": "5/minute"
+    }
 }
 
 # Increase upload limits for photos and videos
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+
+# ──────────────────────────────────────────────
+# Redis Cache Configuration
+# ──────────────────────────────────────────────
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+# ──────────────────────────────────────────────
+# Celery Configuration
+# ──────────────────────────────────────────────
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1")
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'check-expired-transactions-every-5-mins': {
+        'task': 'core.tasks.check_pending_transactions',
+        'schedule': crontab(minute='*/5'),
+    },
+}
 

@@ -10,6 +10,7 @@ import os
 from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -112,22 +113,16 @@ class MasterVariant(models.Model):
         "Varian Warna", max_length=100,
         help_text="Contoh: Golden, Black Bear, Sapphire",
     )
-    jenis_bulu = models.CharField(
-        "Jenis Bulu", max_length=50,
-        choices=JenisBulu.choices, default=JenisBulu.SHORT_HAIR,
-    )
-    is_satin = models.BooleanField("Satin?", default=False)
 
     class Meta:
         db_table = "master_variants"
         verbose_name = "Master Varian"
         verbose_name_plural = "Master Varian"
-        unique_together = ["spesies", "varian_warna", "jenis_bulu", "is_satin"]
+        unique_together = ["spesies", "varian_warna"]
         ordering = ["spesies", "varian_warna"]
 
     def __str__(self):
-        satin_tag = " Satin" if self.is_satin else ""
-        return f"{self.spesies} — {self.varian_warna} ({self.jenis_bulu}{satin_tag})"
+        return f"{self.spesies} — {self.varian_warna}"
 
 
 # ──────────────────────────────────────────────
@@ -259,6 +254,13 @@ class LiveInventory(models.Model):
         JANTAN = "Jantan", "Jantan"
         BETINA = "Betina", "Betina"
         BELUM_DIKETAHUI = "Belum Diketahui", "Belum Diketahui"
+        
+    class JenisBulu(models.TextChoices):
+        SHORT_HAIR = "Short Hair", "Short Hair"
+        MEDIUM_HAIR = "Medium Hair", "Medium Hair"
+        LONG_HAIR = "Long Hair", "Long Hair"
+        REX = "Rex", "Rex"
+        TIDAK_ADA = "Tidak Ada", "Tidak Ada (Aksesoris)"
 
     # Choices usia: kelipatan 0.5 dari 1.0 s.d. 6.0
     USIA_CHOICES = [(Decimal(f"{x / 2:.1f}"), f"{x / 2:.1f} Bulan") for x in range(2, 13)]
@@ -291,6 +293,11 @@ class LiveInventory(models.Model):
         "Jenis Kelamin", max_length=20,
         choices=JenisKelamin.choices, default=JenisKelamin.BELUM_DIKETAHUI,
     )
+    jenis_bulu = models.CharField(
+        "Jenis Bulu", max_length=50,
+        choices=JenisBulu.choices, default=JenisBulu.SHORT_HAIR,
+    )
+    is_satin = models.BooleanField("Satin?", default=False)
     usia_bulan = models.DecimalField(
         "Usia (bulan)", max_digits=3, decimal_places=1,
         choices=USIA_CHOICES, null=True, blank=True
@@ -419,6 +426,7 @@ class Transaction(models.Model):
     tanggal_kirim = models.DateField("Tanggal Kirim", null=True, blank=True)
     hamsters_mati = models.TextField("Hamster Bermasalah", blank=True, null=True)
     alasan_batal = models.TextField("Alasan Pembatalan", blank=True, null=True)
+    bukti_refund = models.URLField("Bukti Refund", max_length=500, blank=True)
     
     # DOKU Payment Gateway
     payment_url = models.URLField("DOKU Payment URL", max_length=500, blank=True)
@@ -552,6 +560,8 @@ class ChatMessage(models.Model):
         related_name="chat_mentions",
         verbose_name="Terkait Produk"
     )
+    media_url = models.URLField("URL Media", max_length=500, blank=True, null=True)
+    media_type = models.CharField("Tipe Media", max_length=20, blank=True, null=True, help_text="image atau video")
     is_read = models.BooleanField("Sudah Dibaca?", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -561,3 +571,33 @@ class ChatMessage(models.Model):
         verbose_name_plural = "Pesan Chat"
         ordering = ["created_at"]
 
+
+
+# ──────────────────────────────────────────────
+# 13. Expense (Pengeluaran Operasional)
+# ──────────────────────────────────────────────
+class Expense(models.Model):
+    class KategoriPengeluaran(models.TextChoices):
+        PAKAN = "Pakan", "Pakan"
+        BEDDING = "Serbuk/Bedding", "Serbuk/Bedding"
+        VITAMIN = "Vitamin/Obat", "Vitamin/Obat"
+        PACKING = "Kardus/Packing", "Kardus/Packing"
+        LAINNYA = "Lain-lain", "Lain-lain"
+
+    expense_id = models.AutoField(primary_key=True)
+    tanggal = models.DateField("Tanggal", default=timezone.now)
+    kategori = models.CharField(
+        "Kategori", max_length=50, choices=KategoriPengeluaran.choices, default=KategoriPengeluaran.LAINNYA
+    )
+    keterangan = models.CharField("Keterangan", max_length=200, help_text="Contoh: Beli pelet 10kg")
+    nominal = models.PositiveIntegerField("Nominal (Rp)", default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "expenses"
+        verbose_name = "Pengeluaran"
+        verbose_name_plural = "Pengeluaran"
+        ordering = ["-tanggal", "-created_at"]
+
+    def __str__(self):
+        return f"{self.tanggal} - {self.kategori}: Rp {self.nominal}"

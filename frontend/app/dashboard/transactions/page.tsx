@@ -107,9 +107,17 @@ export default function TransactionsPage() {
   const [trackingNumber, setTrackingNumber] = useState<string>("");
   const [shippingDate, setShippingDate] = useState<string>("");
   const [refundAmount, setRefundAmount] = useState<string>("");
+  const [refundProof, setRefundProof] = useState<File | null>(null);
+  const [isUploadingRefund, setIsUploadingRefund] = useState(false);
+  const refundFileInputRef = useRef<HTMLInputElement>(null);
   const [cancellationReason, setCancellationReason] = useState<string>("");
   const [manualReason, setManualReason] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Modal untuk preview bukti refund
+  const [previewModal, setPreviewModal] = useState<{ show: boolean, url: string, type: string }>({ show: false, url: "", type: "image" });
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [manualPaymentMethod, setManualPaymentMethod] = useState<string>("");
 
@@ -323,7 +331,25 @@ export default function TransactionsPage() {
   };
 
 
-  const updateStatus = async (id: number, newStatus?: string, nominalDp?: number, resi?: string, nominalRefund?: number, shipDateInput?: string, hamsterCodes?: string, alasanBatal?: string, metodePembayaran?: string, sudahVideoPacking?: boolean) => {
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (!cloudName || !uploadPreset) throw new Error("Konfigurasi Cloudinary tidak ditemukan.");
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", uploadPreset);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+      method: "POST",
+      body: fd
+    });
+    if (!res.ok) throw new Error(`Cloudinary error: ${res.status}`);
+    const data = await res.json();
+    return data.secure_url;
+  };
+
+  const updateStatus = async (id: number, newStatus?: string, nominalDp?: number, resi?: string, nominalRefund?: number, shipDateInput?: string, hamsterCodes?: string, alasanBatal?: string, metodePembayaran?: string, sudahVideoPacking?: boolean, buktiRefundUrl?: string) => {
     setLoading(true);
     try {
       const body: any = {
@@ -350,6 +376,10 @@ export default function TransactionsPage() {
         body.sudah_video_packing = sudahVideoPacking;
       }
 
+      if (buktiRefundUrl) {
+        body.bukti_refund = buktiRefundUrl;
+      }
+
       const res = await fetch(`/api/dashboard/transactions/${id}/`, {
         method: 'PATCH',
         headers: {
@@ -367,6 +397,7 @@ export default function TransactionsPage() {
         setCancellationReason("");
         setManualReason("");
         setSelectedTrxDetail(null);
+        setRefundProof(null);
         fetchTransactions();
       } else {
         alert('❌ Gagal memperbarui status.');
@@ -387,17 +418,31 @@ export default function TransactionsPage() {
     fetchCouriers();
   }, []);
 
-  // Logika Filtering untuk Tab
+  // Logika Filtering untuk Tab dan Pencarian
   const filteredTransactions = transactions.filter(trx => {
+    // 1. Tab Filtering
+    let matchTab = true;
+    if (activeTab === 'menunggu') matchTab = ['PENDING', 'BELUM LUNAS', 'DP'].includes(trx.status_pembayaran);
+    else if (activeTab === 'siap-packing') matchTab = trx.status_pembayaran === 'LUNAS' && !trx.sudah_video_packing;
+    else if (activeTab === 'siap-kirim') matchTab = trx.status_pembayaran === 'LUNAS' && trx.sudah_video_packing && !trx.nomor_resi;
+    else if (activeTab === 'dikirim') matchTab = trx.status_pembayaran === 'DIKIRIM';
+    else if (activeTab === 'garansi') matchTab = trx.status_pembayaran === 'GARANSI';
+    else if (activeTab === 'selesai') matchTab = ['SAMPAI', 'REFUNDED'].includes(trx.status_pembayaran);
+    else if (activeTab === 'batal') matchTab = trx.status_pembayaran === 'CANCELLED';
 
-    if (activeTab === 'menunggu') return ['PENDING', 'BELUM LUNAS', 'DP'].includes(trx.status_pembayaran);
-    if (activeTab === 'siap-packing') return trx.status_pembayaran === 'LUNAS' && !trx.sudah_video_packing;
-    if (activeTab === 'siap-kirim') return trx.status_pembayaran === 'LUNAS' && trx.sudah_video_packing && !trx.nomor_resi;
-    if (activeTab === 'dikirim') return trx.status_pembayaran === 'DIKIRIM';
-    if (activeTab === 'garansi') return trx.status_pembayaran === 'GARANSI';
-    if (activeTab === 'selesai') return ['SAMPAI', 'REFUNDED'].includes(trx.status_pembayaran);
-    if (activeTab === 'batal') return trx.status_pembayaran === 'CANCELLED';
-    return true;
+    // 2. Search Filtering
+    let matchSearch = true;
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase();
+      const trxIdStr = trx.transaction_id ? `inv-${trx.transaction_id}`.toLowerCase() : '';
+      const nama = (trx.nama_customer || trx.alamat_data?.nama_penerima || '').toLowerCase();
+      const wa = (trx.nomor_wa || trx.alamat_data?.nomor_wa || '').toLowerCase();
+      const resi = (trx.nomor_resi || '').toLowerCase();
+      
+      matchSearch = trxIdStr.includes(q) || nama.includes(q) || wa.includes(q) || resi.includes(q);
+    }
+
+    return matchTab && matchSearch;
   });
 
   const getCount = (tab: string) => {
@@ -798,7 +843,7 @@ export default function TransactionsPage() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 transform animate-in zoom-in-95 duration-200">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-indigo-200 animate-pulse">
-                🖨️
+                ️
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Cetak Kumpulan Resi</h3>
               <p className="text-gray-500 text-xs leading-relaxed mb-6">
@@ -816,7 +861,7 @@ export default function TransactionsPage() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">📄</span>
+                    <span className="text-xl"></span>
                     <div className="text-left">
                       <div className="font-bold text-gray-800 text-sm">78 x 100 mm</div>
                       <div className="text-[10px] text-gray-500 font-medium">Ukuran Standar Noska (Default)</div>
@@ -839,7 +884,7 @@ export default function TransactionsPage() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">📃</span>
+                    <span className="text-xl"></span>
                     <div className="text-left">
                       <div className="font-bold text-gray-800 text-sm">100 x 150 mm</div>
                       <div className="text-[10px] text-gray-500 font-medium">Ukuran Besar (A6)</div>
@@ -971,6 +1016,38 @@ export default function TransactionsPage() {
                 </div>
               )}
 
+              {confirmModal.status === 'REFUNDED' && (
+                <div className="mt-2 mb-4 bg-red-50 p-4 rounded-xl border border-red-100 text-left">
+                  <label className="block text-xs font-bold text-red-700 uppercase mb-2">Upload Bukti Transfer</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      ref={refundFileInputRef}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setRefundProof(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => refundFileInputRef.current?.click()}
+                      className="px-4 py-2 bg-white border border-red-200 text-red-600 font-bold rounded-lg hover:bg-red-100 transition text-sm whitespace-nowrap"
+                    >
+                      Pilih File
+                    </button>
+                    <span className="text-xs text-red-500 truncate flex-1">
+                      {refundProof ? refundProof.name : 'Belum ada file dipilih (opsional)'}
+                    </span>
+                    {refundProof && (
+                      <button type="button" onClick={() => setRefundProof(null)} className="text-red-500 font-bold hover:text-red-700 px-2">✕</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {confirmModal.status === 'CANCELLED' && (
                 <div className="mt-2 mb-4 bg-red-50 p-4 rounded-xl border border-red-100 text-left">
                   <label className="block text-xs font-bold text-red-700 uppercase mb-2">Alasan Pembatalan *</label>
@@ -1043,8 +1120,8 @@ export default function TransactionsPage() {
                       setShippingDate("");
                       setCancellationReason("");
                       setManualReason("");
-                      setPaymentMethod("");
                       setManualPaymentMethod("");
+                      setRefundProof(null);
                     }}
                     className="px-4 py-2.5 text-gray-500 font-bold text-sm hover:bg-gray-100 rounded-xl transition"
                   >
@@ -1054,8 +1131,12 @@ export default function TransactionsPage() {
                     onClick={() => {
                       if (confirmModal.status === 'VIDEO_PACKING') {
                         const trx = transactions.find(t => t.transaction_id === confirmModal.id);
-                        const text = encodeURIComponent(`Kirim hari ini ya kak, berikut video waktu packing-nya.\nUntuk resi-nya menyusul ya kak 🙏`);
-                        window.open(`https://wa.me/${trx?.nomor_wa}?text=${text}`, '_blank');
+                        const text = `Kirim hari ini ya kak, berikut video waktu packing-nya.\nUntuk resi-nya menyusul ya kak `;
+                        fetch(`/api/dashboard/transactions/${confirmModal.id}/send_chat/`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ message: text })
+                        });
                         updateStatus(confirmModal.id, trx?.status_pembayaran, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
                       } else if (confirmModal.status === 'DIKIRIM') {
                         const trx = transactions.find(t => t.transaction_id === confirmModal.id);
@@ -1066,15 +1147,7 @@ export default function TransactionsPage() {
                           return;
                         }
 
-                        const kurir = trx?.keterangan_kurir?.toUpperCase() || "";
-                        let trackingUrl = "";
-                        if (kurir.includes("TIKI")) trackingUrl = `https://tiki.id/id/track/${trackingNumber}`;
-                        else if (kurir.includes("POS")) trackingUrl = `https://www.posindonesia.co.id/id/tracking/${trackingNumber}`;
 
-                        if (!trackingUrl) trackingUrl = `https://cekresi.com/?noresi=${trackingNumber}`;
-
-                        const text = encodeURIComponent(`Ini ya kak untuk foto resi-nya. Bisa dilacak melalui link berikut:\n${trackingUrl}\n\nJika paket sudah sampai mohon segera dibuka, dan jangan lupa video unboxing nya ya kak 🙏`);
-                        window.open(`https://wa.me/${trx?.nomor_wa}?text=${text}`, '_blank');
                         updateStatus(
                           confirmModal.id,
                           'DIKIRIM',
@@ -1087,23 +1160,42 @@ export default function TransactionsPage() {
                           undefined
                         );
                       } else {
-                        updateStatus(
-                          confirmModal.id,
-                          confirmModal.status === 'EDIT_DATE' ? undefined : confirmModal.status,
-                          confirmModal.status === 'DP' ? parseInt(dpAmount) || 0 : undefined,
-                          confirmModal.status === 'DIKIRIM' ? trackingNumber : undefined,
-                          confirmModal.status === 'REFUNDED' ? parseInt(refundAmount) || 0 : undefined,
-                          (confirmModal.status === 'LUNAS' || confirmModal.status === 'EDIT_DATE') ? shippingDate : undefined,
-                          undefined,
-                          confirmModal.status === 'CANCELLED' ? (cancellationReason === 'Lainnya' ? manualReason : cancellationReason) : undefined,
-                          ['LUNAS', 'DP'].includes(confirmModal.status) ? (paymentMethod === 'Lainnya' ? manualPaymentMethod : paymentMethod) : undefined
-                        );
+                        const doUpdate = async () => {
+                          let buktiUrl = undefined;
+                          if (confirmModal.status === 'REFUNDED' && refundProof) {
+                            setIsUploadingRefund(true);
+                            try {
+                              buktiUrl = await uploadToCloudinary(refundProof);
+                            } catch (err) {
+                              alert("Gagal mengunggah bukti refund.");
+                              setIsUploadingRefund(false);
+                              return;
+                            }
+                            setIsUploadingRefund(false);
+                          }
+                          
+                          updateStatus(
+                            confirmModal.id,
+                            confirmModal.status === 'EDIT_DATE' ? undefined : confirmModal.status,
+                            confirmModal.status === 'DP' ? parseInt(dpAmount) || 0 : undefined,
+                            confirmModal.status === 'DIKIRIM' ? trackingNumber : undefined,
+                            confirmModal.status === 'REFUNDED' ? parseInt(refundAmount) || 0 : undefined,
+                            (confirmModal.status === 'LUNAS' || confirmModal.status === 'EDIT_DATE') ? shippingDate : undefined,
+                            undefined,
+                            confirmModal.status === 'CANCELLED' ? (cancellationReason === 'Lainnya' ? manualReason : cancellationReason) : undefined,
+                            ['LUNAS', 'DP'].includes(confirmModal.status) ? (paymentMethod === 'Lainnya' ? manualPaymentMethod : paymentMethod) : undefined,
+                            undefined,
+                            buktiUrl
+                          );
+                        };
+                        doUpdate();
                       }
                     }}
-                    className="px-4 py-2.5 bg-brand-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-100 hover:bg-brand-700 transition"
+                    disabled={isUploadingRefund}
+                    className={`px-4 py-2.5 font-bold text-sm rounded-xl shadow-lg transition ${isUploadingRefund ? 'bg-gray-400 text-white cursor-wait' : 'bg-brand-600 text-white shadow-brand-100 hover:bg-brand-700'}`}
                   >
-                    {confirmModal.status === 'EDIT_DATE' ? 'Simpan Perubahan' :
-                      confirmModal.status === 'VIDEO_PACKING' ? 'Ya, Proses' : 'Ya, Ubah'}
+                    {isUploadingRefund ? 'Mengunggah...' : (confirmModal.status === 'EDIT_DATE' ? 'Simpan Perubahan' :
+                      confirmModal.status === 'VIDEO_PACKING' ? 'Ya, Proses' : 'Ya, Ubah')}
                   </button>
                 </>
               )}
@@ -1268,89 +1360,119 @@ export default function TransactionsPage() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative max-w-lg">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            className="block w-full pl-11 pr-4 py-3 border border-gray-200 shadow-sm rounded-2xl leading-5 bg-white placeholder-gray-400 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition duration-150 ease-in-out"
+            placeholder="Cari Invoice, Nama, WhatsApp, atau Resi..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
       <div className="mt-6">
         {filteredTransactions.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center text-gray-500 font-medium">
-            <span className="text-3xl block mb-2">📦</span>
+            <span className="text-3xl block mb-2"></span>
             Tidak ada transaksi di tab ini.
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
-            {filteredTransactions.map((trx) => {
-              return (
-                <div
-                  key={trx.transaction_id}
-                  onClick={() => setSelectedTrxDetail(trx)}
-                  className="bg-white rounded-2xl border border-gray-200 p-3.5 md:p-5 shadow-sm hover:shadow-md hover:border-brand-400 hover:scale-[1.01] transition-all flex flex-col justify-between cursor-pointer group"
-                >
-                  <div className="space-y-3.5">
-                    {/* Top Header info */}
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="font-semibold text-gray-700 text-xs">
-                        #{trx.transaction_id}
-                      </span>
-                      
-                      {/* Status Badge */}
-                      {(() => {
-                        const badge = getStatusBadge(trx);
-                        let textColorClass = "text-orange-600";
-                        if (badge.className.includes("text-red-600")) textColorClass = "text-red-600";
-                        else if (badge.className.includes("text-blue-600")) textColorClass = "text-blue-600";
-                        else if (badge.className.includes("text-emerald-600")) textColorClass = "text-emerald-600";
-                        else if (badge.className.includes("text-amber-600")) textColorClass = "text-amber-600";
-                        else if (badge.className.includes("text-purple-600")) textColorClass = "text-purple-600";
-                        else if (badge.className.includes("text-green-600")) textColorClass = "text-green-600";
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto custom-scrollbar">
+              <div className="min-w-[950px]">
+                {/* Table Header */}
+                <div className="flex items-center gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  <div className="w-10 text-center">No.</div>
+                  <div className="w-16">ID</div>
+                  <div className="w-32">Tanggal & Waktu</div>
+                  <div className="flex-1">Pelanggan</div>
+                  <div className="flex-1">Penerima</div>
+                  <div className="w-32 text-right">Total Belanja</div>
+                  <div className="w-32 text-center">Status</div>
+                </div>
 
-                        return (
-                          <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider text-[8px] md:text-[9px] ${textColorClass}`}>
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-current"></span>
-                            </span>
-                            {badge.text}
+                {/* Table Body */}
+                <div className="flex flex-col divide-y divide-gray-100">
+                  {filteredTransactions.map((trx, index) => {
+                    const badge = getStatusBadge(trx);
+                    let textColorClass = "text-orange-600";
+                    let bgBadgeClass = "bg-orange-50 border-orange-100";
+                    if (badge.className.includes("text-red-600")) { textColorClass = "text-red-600"; bgBadgeClass = "bg-red-50 border-red-100"; }
+                    else if (badge.className.includes("text-blue-600")) { textColorClass = "text-blue-600"; bgBadgeClass = "bg-blue-50 border-blue-100"; }
+                    else if (badge.className.includes("text-emerald-600")) { textColorClass = "text-emerald-600"; bgBadgeClass = "bg-emerald-50 border-emerald-100"; }
+                    else if (badge.className.includes("text-amber-600")) { textColorClass = "text-amber-600"; bgBadgeClass = "bg-amber-50 border-amber-100"; }
+                    else if (badge.className.includes("text-purple-600")) { textColorClass = "text-purple-600"; bgBadgeClass = "bg-purple-50 border-purple-100"; }
+                    else if (badge.className.includes("text-green-600")) { textColorClass = "text-green-600"; bgBadgeClass = "bg-green-50 border-green-100"; }
+
+                    return (
+                      <div
+                        key={trx.transaction_id}
+                        onClick={() => setSelectedTrxDetail(trx)}
+                        className="flex items-center gap-4 p-4 hover:bg-orange-50/30 transition-colors cursor-pointer group"
+                      >
+                        <div className="w-10 text-center text-xs font-semibold text-gray-400">{index + 1}</div>
+                        
+                        <div className="w-16 font-extrabold text-gray-900 text-sm">
+                          #{trx.transaction_id}
+                        </div>
+                        
+                        <div className="w-32 text-[11px] text-gray-600 font-medium">
+                          {trx.created_at ? new Date(trx.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(' pukul ', ', ') : '-'}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <span className="block font-bold text-gray-800 text-sm truncate" title={trx.nama_customer || trx.alamat_data?.nama_penerima}>
+                            {trx.nama_customer !== 'No Name' ? trx.nama_customer : (trx.alamat_data?.nama_penerima || '-')}
                           </span>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Customer & Recipient Details */}
-                    <div className="space-y-3 border-t border-gray-100 pt-2.5">
-                      <div>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">
-                          Pelanggan
-                        </span>
-                        <div className="text-xs md:text-sm font-semibold text-gray-800 leading-tight">
-                          {trx.nama_customer && trx.nama_customer !== 'No Name' && (
-                            <span className="block text-gray-950 mb-0.5 font-bold truncate max-w-full" title={trx.nama_customer}>
-                              {trx.nama_customer}
-                            </span>
-                          )}
-                          <span className="text-green-700 block truncate max-w-full">
-                            {trx.nomor_wa}
+                          <span className="block text-xs text-green-700 font-bold mt-0.5 truncate">
+                            {trx.nomor_wa || trx.alamat_data?.nomor_wa}
                           </span>
                         </div>
-                      </div>
 
-                      {trx.alamat_lengkap && trx.alamat_data && (
-                        <div>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">
-                            Penerima
-                          </span>
-                          <div className="text-xs md:text-sm font-semibold text-gray-800 leading-tight">
-                            <span className="block text-gray-950 mb-0.5 font-bold truncate max-w-full" title={trx.alamat_data.nama_penerima}>
-                              {trx.alamat_data.nama_penerima}
+                        <div className="flex-1 min-w-0">
+                          {trx.alamat_data ? (
+                            <>
+                              <span className="block font-bold text-gray-800 text-sm truncate" title={trx.alamat_data.nama_penerima}>
+                                {trx.alamat_data.nama_penerima}
+                              </span>
+                              <span className="block text-xs text-gray-500 font-bold mt-0.5 truncate">
+                                {trx.alamat_data.nomor_wa}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-gray-400 text-xs italic">-</span>
+                          )}
+                        </div>
+
+                        <div className="w-32 text-right font-black text-gray-900 text-sm">
+                          Rp {trx.total_bayar.toLocaleString('id-ID')}
+                        </div>
+
+                        <div className="w-32 flex justify-center">
+                          <div className={`px-3 py-1.5 rounded-lg border flex items-center justify-center gap-1.5 shadow-sm w-full ${bgBadgeClass}`}>
+                            <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>
+                              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${textColorClass}`}></span>
                             </span>
-                            <span className="text-gray-500 block truncate max-w-full">
-                              {trx.alamat_data.nomor_wa}
+                            <span className={`font-bold uppercase tracking-wider text-[9px] truncate ${textColorClass}`}>
+                              {badge.text}
                             </span>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1868,6 +1990,21 @@ export default function TransactionsPage() {
                       <span className="text-xs font-black text-red-700">Rp {selectedTrxDetail.nominal_refund.toLocaleString('id-ID')}</span>
                     </div>
                   )}
+                  {selectedTrxDetail.bukti_refund && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = selectedTrxDetail.bukti_refund || "";
+                          const type = url.toLowerCase().endsWith(".mp4") || url.toLowerCase().endsWith(".mov") || url.toLowerCase().endsWith(".webm") ? "video" : "image";
+                          setPreviewModal({ show: true, url, type });
+                        }}
+                        className="inline-block mt-1 px-3 py-1.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-lg border border-red-200 hover:bg-red-200 transition-colors"
+                      >
+                        Lihat Bukti Transfer
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
                 </div>
@@ -2196,7 +2333,7 @@ export default function TransactionsPage() {
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-xl border border-green-100">
-                    📍
+                    
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900 leading-tight">Detail Alamat</h3>
@@ -2246,6 +2383,27 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
+      {/* Preview Bukti Modal */}
+      {previewModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm" onClick={() => setPreviewModal({ show: false, url: "", type: "image" })}>
+          <div className="bg-white rounded-3xl overflow-hidden w-full max-w-lg mx-auto shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-bold text-gray-800">Bukti Transfer Refund</h3>
+              <button onClick={() => setPreviewModal({ show: false, url: "", type: "image" })} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 bg-gray-50 flex justify-center items-center" style={{ minHeight: '300px' }}>
+              {previewModal.type === 'video' ? (
+                <video controls src={previewModal.url} className="max-w-full max-h-[60vh] object-contain rounded-xl" />
+              ) : (
+                <img src={previewModal.url} alt="Bukti Transfer Refund" className="max-w-full max-h-[60vh] object-contain rounded-xl" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

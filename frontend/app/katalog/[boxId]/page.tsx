@@ -65,7 +65,7 @@ export default async function BoxDetailPage({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <span className="text-5xl">🐹</span>
+            <span className="text-5xl"></span>
             <p className="mt-4 text-lg font-semibold text-text-secondary">
               Box ini masih kosong
             </p>

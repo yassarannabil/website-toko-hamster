@@ -84,7 +84,7 @@ export default async function KatalogPage() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <span className="text-5xl">📦</span>
+            <span className="text-5xl"></span>
             <p className="mt-4 text-lg font-semibold text-text-secondary">
               Stok belum disiapkan
             </p>

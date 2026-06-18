@@ -36,9 +36,7 @@ class DokuNotificationAPIView(APIView):
         # hmac.compare_digest is safer against timing attacks
         if not hmac.compare_digest(expected_signature, signature_header):
             print(f"Signature mismatch. Expected: {expected_signature}, Got: {signature_header}")
-            # return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
-            # Some reverse proxies modify paths, so we might want to log it rather than immediately fail in development
-            pass
+            return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
             
         # Process the payload
         try:

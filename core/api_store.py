@@ -23,7 +23,7 @@ class InventoryDetailAPIView(APIView):
             "kode_hamster": inv.kode_hamster,
             "varian": str(inv.variant),
             "harga": inv.harga_display,
-            "foto_preview": request.build_absolute_uri(inv.foto_preview.url) if inv.foto_preview else None,
+            "foto_preview": (inv.foto_preview.name if str(inv.foto_preview.name).startswith("http") else request.build_absolute_uri(inv.foto_preview.url)) if inv.foto_preview else None,
         })
 
 class CartAPIView(APIView):
@@ -55,7 +55,7 @@ class CartAPIView(APIView):
                 "varian": str(inv.variant),
                 "jenis_kelamin": inv.jenis_kelamin,
                 "harga": inv.harga_display,
-                "foto_preview": request.build_absolute_uri(inv.foto_preview.url) if inv.foto_preview else None,
+                "foto_preview": (inv.foto_preview.name if str(inv.foto_preview.name).startswith("http") else request.build_absolute_uri(inv.foto_preview.url)) if inv.foto_preview else None,
                 "status_ketersediaan": inv.status_ketersediaan,
             })
             if inv.status_ketersediaan == LiveInventory.StatusKetersediaan.TERSEDIA:

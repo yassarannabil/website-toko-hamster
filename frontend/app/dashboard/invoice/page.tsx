@@ -146,7 +146,7 @@ export default function InvoiceGeneratorPage() {
           try {
             const item = new ClipboardItem({ "image/png": blob });
             await navigator.clipboard.write([item]);
-            setCopyStatus("📸 Gambar Tersalin!");
+            setCopyStatus(" Gambar Tersalin!");
             setTimeout(() => setCopyStatus(''), 3000);
           } catch (err) {
             console.error("Clipboard err", err);
@@ -341,7 +341,7 @@ export default function InvoiceGeneratorPage() {
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '11px', color: '#9ca3af' }}>
-              Terima kasih telah berbelanja di Noska Hamster! 🐹
+              Terima kasih telah berbelanja di Noska Hamster! 
             </div>
           </div>
         </div>

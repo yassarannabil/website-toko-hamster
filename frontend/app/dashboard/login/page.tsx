@@ -4,20 +4,40 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Password sederhana (Bisa dipindah ke .env nanti)
-    if (password === "adminnoska") {
-      // Set cookie berlaku selama 7 hari
-      document.cookie = "noska_admin_token=valid; path=/; max-age=" + (7 * 24 * 60 * 60);
-      router.push("/dashboard");
-    } else {
-      setError("Password salah! Silakan coba lagi.");
+    setLoading(true);
+    setError("");
+
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${baseUrl}/api/auth/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.user?.is_staff) {
+        // Set cookie berlaku selama 7 hari
+        document.cookie = `noska_admin_token=${data.token}; path=/; max-age=` + (7 * 24 * 60 * 60) + `; Secure; SameSite=Strict`;
+        router.push("/dashboard");
+      } else if (res.ok && !data.user?.is_staff) {
+        setError("Akses ditolak! Akun ini bukan administrator.");
+      } else {
+        setError(data.error || "Email atau password salah.");
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan jaringan.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -26,7 +46,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         {/* Header Decor */}
         <div className="h-2 bg-gradient-to-right from-orange-500 to-amber-500"></div>
-        
+
         <div className="p-6 sm:p-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black text-orange-600 tracking-tighter">NOSKA HAMSTER</h1>
@@ -35,7 +55,19 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Password Admin</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Email Admin</label>
+              <input
+                type="email"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-0 outline-none transition-all"
+                placeholder="admin@noskahamster.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Password</label>
               <input
                 type="password"
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-0 outline-none transition-all font-mono"
@@ -48,15 +80,16 @@ export default function LoginPage() {
 
             {error && (
               <div className="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-lg border border-red-100 animate-shake">
-                ⚠️ {error}
+                {error}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-orange-700 shadow-lg shadow-orange-200 transition-all transform active:scale-95"
+              disabled={loading}
+              className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-orange-700 shadow-lg shadow-orange-200 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Masuk ke Dashboard
+              {loading ? "Memverifikasi..." : "Masuk ke Dashboard"}
             </button>
           </form>
 

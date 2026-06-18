@@ -26,6 +26,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
   const router = useRouter();
 
   const sold = item.status_ketersediaan === "Terjual";
@@ -54,7 +55,9 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal menambahkan.");
-      alert(data.message);
+      
+      setToastMsg("Berhasil ditambahkan ke keranjang! 🛒");
+      setTimeout(() => setToastMsg(""), 3000);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -75,6 +78,16 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
           : "hover:shadow-xl hover:shadow-brand-200/40 hover:-translate-y-1"
         }`}
     >
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 rounded-full bg-gray-900/90 px-5 py-3 text-sm font-medium text-white shadow-xl backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
+          <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {toastMsg}
+        </div>
+      )}
+
       {/* Status Badge */}
       <div className="absolute top-3 left-3 z-10">
         <span
@@ -212,7 +225,7 @@ export default function HamsterCard({ item, isAdminView = false }: { item: Hamst
         {/* Catatan Kondisi Fisik */}
         {item.kondisi_fisik && item.kondisi_fisik.trim() !== "" && (
           <div className="text-[11px] bg-amber-50/70 text-amber-800 border border-amber-100/80 rounded-xl p-2.5 leading-relaxed font-medium flex items-start gap-1.5 mt-0.5">
-            <span className="text-sm leading-none flex-shrink-0 select-none">📢</span>
+            <span className="text-sm leading-none flex-shrink-0 select-none"></span>
             <div className="flex-1">
               <span className="font-extrabold block text-[10px] uppercase tracking-wider text-amber-600 mb-0.5">Kondisi Fisik:</span>
               {item.kondisi_fisik}

@@ -64,8 +64,14 @@ class RegisterAPIView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+from rest_framework.throttling import AnonRateThrottle
+
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         email = request.data.get('email')
@@ -74,8 +80,16 @@ class LoginAPIView(APIView):
         if not email or not password:
             return Response({"error": "Email dan Password wajib diisi."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Django's default authenticate uses 'username'. Since we save username = email:
-        user = authenticate(username=email, password=password)
+        from django.contrib.auth.models import User
+        
+        # Django's default authenticate uses 'username'. 
+        # Check if email is actually an email, and get the corresponding username
+        user_obj = User.objects.filter(email=email).first()
+        if user_obj:
+            user = authenticate(username=user_obj.username, password=password)
+        else:
+            # Fallback (maybe they entered their username in the email field)
+            user = authenticate(username=email, password=password)
 
         if not user:
             return Response({"error": "Kredensial tidak valid atau akun tidak ditemukan."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -93,7 +107,8 @@ class LoginAPIView(APIView):
                 "id": user.id,
                 "email": user.email,
                 "nama": nama,
-                "wa": wa
+                "wa": wa,
+                "is_staff": user.is_staff
             }
         })
 
@@ -232,7 +247,7 @@ class CustomerTransactionsAPIView(APIView):
             for h in trx.hamsters.all().select_related("variant", "box"):
                 foto_url = ""
                 if h.foto_preview:
-                    foto_url = request.build_absolute_uri(h.foto_preview.url)
+                    foto_url = h.foto_preview.name if str(h.foto_preview.name).startswith("http") else request.build_absolute_uri(h.foto_preview.url)
                 hamsters_data.append({
                     "inventory_id": h.inventory_id,
                     "kode_hamster": h.kode_hamster,
@@ -264,9 +279,50 @@ class CustomerTransactionsAPIView(APIView):
                 "total_bayar": trx.total_bayar,
                 "nomor_resi": trx.nomor_resi,
                 "keterangan_kurir": trx.keterangan_kurir,
+                "bukti_refund": trx.bukti_refund,
                 "alamat": alamat_data,
                 "payment_url": trx.payment_url or "",
                 "created_at": trx.created_at.isoformat(),
             })
 
         return Response(result)
+
+    def put(self, request):
+        customer = Customer.objects.filter(user=request.user).first()
+        transaction_id = request.data.get("transaction_id")
+        action = request.data.get("action")
+        
+        if not customer or not transaction_id:
+            return Response({"error": "Bad Request"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            trx = Transaction.objects.get(transaction_id=transaction_id, customer=customer)
+        except Transaction.DoesNotExist:
+            return Response({"error": "Transaksi tidak ditemukan."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if action == "COMPLETE_ORDER":
+            if trx.status_pembayaran != 'DIKIRIM':
+                return Response({"error": "Pesanan belum dapat diselesaikan."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            trx.status_pembayaran = 'SAMPAI'
+            trx.save()
+            return Response({"success": True, "message": "Pesanan berhasil diselesaikan."}, status=status.HTTP_200_OK)
+            
+        if action == "CANCEL_ORDER":
+            if trx.status_pembayaran != 'PENDING':
+                return Response({"error": "Hanya pesanan berstatus Pending yang dapat dibatalkan."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            trx.status_pembayaran = 'CANCELLED'
+            trx.alasan_batal = 'Dibatalkan oleh Pelanggan'
+            trx.save()
+            
+            # Make sure hamsters are available again
+            # Get the actual objects since it's an M2M field
+            hamsters = trx.hamsters.all()
+            for h in hamsters:
+                h.status_ketersediaan = 'Tersedia'
+                h.save()
+                
+            return Response({"success": True, "message": "Pesanan berhasil dibatalkan."}, status=status.HTTP_200_OK)
+            
+        return Response({"error": "Aksi tidak valid."}, status=status.HTTP_400_BAD_REQUEST)

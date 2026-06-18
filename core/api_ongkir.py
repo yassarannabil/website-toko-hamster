@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
+from django.core.cache import cache
 
 KOMERCE_API_KEY = getattr(settings, 'KOMERCE_API_KEY', os.environ.get("KOMERCE_API_KEY", ""))
 RAJAONGKIR_BASE_URL = "https://rajaongkir.komerce.id/api/v1"
@@ -37,6 +38,11 @@ class OngkirProvincesAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        cache_key = "ro_provinces"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
         try:
             r = requests.get(
                 f"{RAJAONGKIR_BASE_URL}/destination/province", 
@@ -44,6 +50,8 @@ class OngkirProvincesAPIView(APIView):
                 timeout=10
             )
             data = r.json()
+            if r.status_code == 200:
+                cache.set(cache_key, data, timeout=86400)
             return Response(data)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
@@ -55,6 +63,11 @@ class OngkirCitiesAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, province_id):
+        cache_key = f"ro_cities_prov_{province_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
         try:
             r = requests.get(
                 f"{RAJAONGKIR_BASE_URL}/destination/city/{province_id}", 
@@ -62,6 +75,8 @@ class OngkirCitiesAPIView(APIView):
                 timeout=10
             )
             data = r.json()
+            if r.status_code == 200:
+                cache.set(cache_key, data, timeout=86400)
             return Response(data)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
@@ -73,6 +88,11 @@ class OngkirDistrictsAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, city_id):
+        cache_key = f"ro_districts_city_{city_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
         try:
             r = requests.get(
                 f"{RAJAONGKIR_BASE_URL}/destination/district/{city_id}", 
@@ -80,6 +100,8 @@ class OngkirDistrictsAPIView(APIView):
                 timeout=10
             )
             data = r.json()
+            if r.status_code == 200:
+                cache.set(cache_key, data, timeout=86400)
             return Response(data)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
@@ -91,6 +113,11 @@ class OngkirSubdistrictsAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, district_id):
+        cache_key = f"ro_subdistricts_dist_{district_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
         try:
             r = requests.get(
                 f"{RAJAONGKIR_BASE_URL}/destination/sub-district/{district_id}", 
@@ -98,6 +125,8 @@ class OngkirSubdistrictsAPIView(APIView):
                 timeout=10
             )
             data = r.json()
+            if r.status_code == 200:
+                cache.set(cache_key, data, timeout=86400)
             return Response(data)
         except Exception as e:
             return Response({"error": str(e)}, status=500)

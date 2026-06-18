@@ -313,7 +313,7 @@ export default function AddressModal({ isOpen, onClose, onSelect, currentAddress
                 <div className="py-12 text-center text-gray-400 animate-pulse">Memuat alamat...</div>
               ) : addresses.length === 0 ? (
                 <div className="py-12 text-center">
-                  <div className="text-5xl mb-3">📍</div>
+                  <div className="text-5xl mb-3"></div>
                   <p className="text-gray-500 text-sm mb-1">Belum ada alamat tersimpan.</p>
                   <p className="text-gray-400 text-xs">Tambahkan alamat pengiriman baru.</p>
                 </div>

@@ -10,9 +10,9 @@ interface HamsterImageProps {
   fallbackIcon?: string;
 }
 
-export default function HamsterImage({ src, alt, className = "", fallbackIcon = "🐹" }: HamsterImageProps) {
+export default function HamsterImage({ src, alt, className = "", fallbackIcon = "" }: HamsterImageProps) {
   const [error, setError] = useState(false);
-  const mediaUrl = getRelativeMediaUrl(src);
+  const mediaUrl = getRelativeMediaUrl(src ?? null);
 
   if (!mediaUrl || error) {
     return (

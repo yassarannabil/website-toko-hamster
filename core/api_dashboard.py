@@ -22,7 +22,7 @@ class TransactionDashboardSerializer(serializers.ModelSerializer):
         model = Transaction
         fields = [
             'transaction_id', 'nomor_wa', 'nama_customer', 'status_pembayaran', 'total_bayar', 'nominal_dp',
-            'nominal_refund', 'nomor_resi', 'created_at', 'alamat_lengkap', 'alamat_data', 'hamsters_list', 
+            'nominal_refund', 'bukti_refund', 'nomor_resi', 'created_at', 'alamat_lengkap', 'alamat_data', 'hamsters_list', 
             'keterangan_kurir', 'tanggal_kirim', 'hamsters_mati', 'alasan_batal', 'sudah_video_packing',
             'qty_packing'
         ]
@@ -52,11 +52,11 @@ class TransactionDashboardSerializer(serializers.ModelSerializer):
                 "harga": h.harga_display,
                 "spesies": h.variant.spesies if h.variant else "-",
                 "varian_warna": h.variant.varian_warna if h.variant else "-",
-                "jenis_bulu": h.variant.jenis_bulu if h.variant else "-",
-                "is_satin": h.variant.is_satin if h.variant else False,
+                "jenis_bulu": h.jenis_bulu,
+                "is_satin": h.is_satin,
                 "gender": h.jenis_kelamin,
                 "usia": f"{h.usia_bulan} Bln",
-                "foto": h.foto_preview.url if h.foto_preview else None
+                "foto": (h.foto_preview.name if str(h.foto_preview.name).startswith("http") else h.foto_preview.url) if h.foto_preview else None
             } 
             for h in obj.hamsters.all()
         ]
@@ -65,21 +65,22 @@ class TransactionDashboardSerializer(serializers.ModelSerializer):
         return obj.biaya_packing // 10000 if obj.biaya_packing else 0
 
 class DashboardInventoryAPIView(APIView):
+    permission_classes = [IsAdminUser]
     def get(self, request):
         inventory = LiveInventory.objects.filter(status_ketersediaan="Tersedia").select_related("variant")
         serializer = LiveInventorySerializer(inventory, many=True, context={'request': request})
         return Response(serializer.data)
 
 class DashboardCouriersAPIView(APIView):
+    permission_classes = [IsAdminUser]
     def get(self, request):
         couriers = MasterCourier.objects.filter(is_active=True)
         serializer = MasterCourierSerializer(couriers, many=True)
         return Response(serializer.data)
 
 class DashboardCreateInvoiceAPIView(APIView):
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         data = request.data
@@ -139,15 +140,15 @@ class DashboardCreateInvoiceAPIView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class DashboardTransactionAPIView(APIView):
+    permission_classes = [IsAdminUser]
     def get(self, request):
         transactions = Transaction.objects.select_related('customer', 'alamat').prefetch_related('hamsters').order_by('-created_at')[:50]
         serializer = TransactionDashboardSerializer(transactions, many=True, context={'request': request})
         return Response(serializer.data)
 
 class DashboardTransactionDetailAPIView(APIView):
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def patch(self, request, pk):
         try:
@@ -248,6 +249,9 @@ class DashboardTransactionDetailAPIView(APIView):
         if 'hamsters_mati' in data:
             trx.hamsters_mati = data['hamsters_mati']
 
+        if 'bukti_refund' in data:
+            trx.bukti_refund = data['bukti_refund']
+
         if new_status in ['LUNAS', 'PENDING', 'DP', 'CANCELLED', 'BELUM LUNAS', 'DIKIRIM', 'SAMPAI', 'GARANSI', 'REFUNDED']:
             trx.status_pembayaran = new_status
             
@@ -276,7 +280,25 @@ class DashboardTransactionDetailAPIView(APIView):
                 trx.hamsters.exclude(box__spesies=Box.SpesiesChoices.PERLENGKAPAN).exclude(box__nama_box__iexact='aksesoris').update(status_ketersediaan=LiveInventory.StatusKetersediaan.HOLD)
             elif new_status == 'CANCELLED':
                 trx.hamsters.exclude(box__spesies=Box.SpesiesChoices.PERLENGKAPAN).exclude(box__nama_box__iexact='aksesoris').update(status_ketersediaan=LiveInventory.StatusKetersediaan.TERSEDIA)
+
+            # Auto-send message for REFUNDED status
+            if new_status == 'REFUNDED' and 'bukti_refund' in data and data['bukti_refund']:
+                from .models import ChatRoom, ChatMessage
+                room, _ = ChatRoom.objects.get_or_create(customer=trx.customer)
                 
+                media_url = data['bukti_refund']
+                media_type = 'video' if media_url.lower().endswith(('.mp4', '.mov', '.webm')) else 'image'
+                
+                msg = ChatMessage.objects.create(
+                    room=room,
+                    sender_is_admin=True,
+                    message=f"Halo kak, berikut adalah bukti transfer pengembalian dana (refund) untuk pesanan INV-{trx.transaction_id}. Mohon dicek ya kak, dan terima kasih atas pengertiannya.",
+                    media_url=media_url,
+                    media_type=media_type
+                )
+                room.updated_at = msg.created_at
+                room.save()
+
             return Response({"message": f"Status updated to {new_status}"})
         
         trx.save()
@@ -293,6 +315,7 @@ class DashboardTransactionDetailAPIView(APIView):
         return Response({"error": "Invalid status or no data provided"}, status=400)
 
 class DashboardVariantsAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """GET /api/dashboard/variants/ — List all MasterVariant for dropdown."""
     def get(self, request):
         from .models import MasterVariant
@@ -303,19 +326,42 @@ class DashboardVariantsAPIView(APIView):
                 "label": str(v),
                 "spesies": v.spesies,
                 "varian_warna": v.varian_warna,
-                "jenis_bulu": v.jenis_bulu,
-                "is_satin": v.is_satin,
             }
             for v in variants
         ]
         return Response(data)
 
+    def post(self, request):
+        from .models import MasterVariant
+        from rest_framework.permissions import IsAdminUser
+        if not IsAdminUser().has_permission(request, self):
+            return Response({"error": "Unauthorized"}, status=401)
+
+        data = request.data
+        spesies = data.get("spesies")
+        varian_warna = data.get("varian_warna")
+
+        if not spesies or not varian_warna:
+            return Response({"error": "Spesies dan varian_warna wajib diisi."}, status=400)
+
+        variant = MasterVariant.objects.create(
+            spesies=spesies,
+            varian_warna=varian_warna
+        )
+
+        return Response({
+            "variant_id": variant.variant_id,
+            "label": str(variant),
+            "spesies": variant.spesies,
+            "varian_warna": variant.varian_warna,
+        }, status=201)
+
 
 class DashboardAddInventoryAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """POST /api/dashboard/inventory/add/ — Create a new LiveInventory item (JSON, no files)."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         from .models import Box, MasterVariant
@@ -323,6 +369,8 @@ class DashboardAddInventoryAPIView(APIView):
         box_id = data.get("box_id")
         variant_id = data.get("variant_id")
         jenis_kelamin = data.get("jenis_kelamin", "Belum Diketahui")
+        jenis_bulu = data.get("jenis_bulu", "Short Hair")
+        is_satin = data.get("is_satin", False)
         usia_bulan = data.get("usia_bulan") or None
         grade_corak = data.get("grade_corak") or None
         harga_display = data.get("harga_display", 0)
@@ -332,39 +380,42 @@ class DashboardAddInventoryAPIView(APIView):
             return Response({"error": "box_id dan variant_id wajib diisi."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            box = Box.objects.get(pk=box_id, session__is_active=True)
-        except Box.DoesNotExist:
-            return Response({"error": "Box tidak ditemukan atau tidak di sesi aktif."}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
             variant = MasterVariant.objects.get(pk=variant_id)
         except MasterVariant.DoesNotExist:
-            return Response({"error": "Varian tidak ditemukan."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Varian tidak ditemukan"}, status=404)
 
-        item = LiveInventory.objects.create(
-            box=box,
-            variant=variant,
-            jenis_kelamin=jenis_kelamin,
-            usia_bulan=usia_bulan,
-            grade_corak=grade_corak,
-            harga_display=int(harga_display),
-            kondisi_fisik=kondisi_fisik,
-            status_ketersediaan=LiveInventory.StatusKetersediaan.TERSEDIA,
-        )
+        try:
+            box = Box.objects.get(pk=box_id)
+        except Box.DoesNotExist:
+            return Response({"error": "Box tidak ditemukan"}, status=404)
 
-        return Response({
-            "message": "Item berhasil ditambahkan!",
-            "inventory_id": item.inventory_id,
-            "kode_hamster": item.kode_hamster,
-        }, status=status.HTTP_201_CREATED)
+        try:
+            item = LiveInventory.objects.create(
+                box=box,
+                variant=variant,
+                jenis_kelamin=jenis_kelamin,
+                jenis_bulu=jenis_bulu,
+                is_satin=is_satin,
+                usia_bulan=usia_bulan,
+                grade_corak=grade_corak,
+                harga_display=int(harga_display),
+                kondisi_fisik=kondisi_fisik,
+                status_ketersediaan=LiveInventory.StatusKetersediaan.TERSEDIA,
+            )
+            return Response({
+                "message": "Item berhasil ditambahkan!",
+                "inventory_id": item.inventory_id,
+                "kode_hamster": item.kode_hamster,
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DashboardUploadMediaAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """POST /api/dashboard/inventory/<id>/upload/ — Save Cloudinary Public IDs for an inventory item."""
-    from rest_framework.permissions import AllowAny
-    # We no longer need MultiPartParser because we receive JSON now
-    authentication_classes = []  # Bypass CSRF for now
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def post(self, request, pk):
         try:
@@ -396,6 +447,7 @@ class DashboardUploadMediaAPIView(APIView):
 
 
 class DashboardStatsAPIView(APIView):
+    permission_classes = [IsAdminUser]
     def get(self, request):
         from django.utils import timezone
         from django.db.models import Q
@@ -404,9 +456,6 @@ class DashboardStatsAPIView(APIView):
         
         # 1. Menunggu Bayar (PENDING or BELUM LUNAS)
         menunggu_bayar = Transaction.objects.filter(status_pembayaran__in=['PENDING', 'BELUM LUNAS']).count()
-        
-        # 2. Lengkapi Alamat (LUNAS, but alamat is null)
-        lengkapi_alamat = Transaction.objects.filter(status_pembayaran='LUNAS', alamat__isnull=True).count()
         
         # 3. Siap Packing
         siap_packing = Transaction.objects.filter(
@@ -436,7 +485,6 @@ class DashboardStatsAPIView(APIView):
 
         return Response({
             "menunggu_bayar": menunggu_bayar,
-            "lengkapi_alamat": lengkapi_alamat,
             "siap_packing": siap_packing,
             "siap_kirim": siap_kirim,
             "dalam_perjalanan": dalam_perjalanan,
@@ -446,10 +494,10 @@ class DashboardStatsAPIView(APIView):
         })
 
 class DashboardSessionsAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """GET/POST /api/dashboard/sessions/ — List or create sessions."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def get(self, request):
         from .models import SetupSession
@@ -479,10 +527,10 @@ class DashboardSessionsAPIView(APIView):
         }, status=201)
 
 class DashboardBoxesBySessionAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """GET/POST /api/dashboard/sessions/<session_id>/boxes/ — List or create boxes for a session."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def get(self, request, session_id):
         from .models import Box
@@ -519,10 +567,10 @@ class DashboardBoxesBySessionAPIView(APIView):
         return Response(serializer.data, status=201)
 
 class DashboardSessionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """PUT/DELETE /api/dashboard/sessions/<session_id>/ — Manage a specific session."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def put(self, request, session_id):
         from .models import SetupSession
@@ -567,10 +615,10 @@ class DashboardSessionDetailAPIView(APIView):
 
 
 class DashboardSessionDuplicateAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """POST /api/dashboard/sessions/<session_id>/duplicate/ — Duplicate a session."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def post(self, request, session_id):
         from django.db import transaction
@@ -611,6 +659,8 @@ class DashboardSessionDuplicateAPIView(APIView):
                         variant=item.variant,
                         jenis_kelamin=item.jenis_kelamin,
                         usia_bulan=item.usia_bulan,
+                        jenis_bulu=item.jenis_bulu,
+                        is_satin=item.is_satin,
                         grade_corak=item.grade_corak,
                         kondisi_fisik=item.kondisi_fisik,
                         harga_display=item.harga_display,
@@ -627,10 +677,10 @@ class DashboardSessionDuplicateAPIView(APIView):
 
 
 class DashboardBoxDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """PUT/DELETE /api/dashboard/boxes/<box_id>/ — Edit or delete a box."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def put(self, request, box_id):
         from .models import Box
@@ -689,6 +739,7 @@ class DashboardBoxDetailAPIView(APIView):
 
 
 class DashboardBoxItemsAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """GET /api/dashboard/boxes/<box_id>/items/ — List ALL items in a box (including Disembunyikan)."""
 
     def get(self, request, box_id):
@@ -717,10 +768,10 @@ class DashboardBoxItemsAPIView(APIView):
 
 
 class DashboardItemDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """PUT/DELETE /api/dashboard/items/<item_id>/ — Edit or delete an inventory item."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def put(self, request, item_id):
         from .models import LiveInventory, Box
@@ -791,31 +842,42 @@ class DashboardItemDetailAPIView(APIView):
             "box_id": item.box_id,
         })
 
+    def delete(self, request, item_id):
+        from .models import LiveInventory
+        try:
+            item = LiveInventory.objects.get(pk=item_id)
+        except LiveInventory.DoesNotExist:
+            return Response({"error": "Item tidak ditemukan."}, status=404)
+
+        item.delete()
+        return Response({"success": True}, status=200)
+
 class DashboardChatRoomsAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """GET /api/dashboard/chat/rooms/ — Admin only, relies on Next.js middleware."""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def get(self, request):
         from .models import ChatRoom
-        rooms = ChatRoom.objects.all().select_related('customer')
+        from django.db.models import Count
+        rooms = ChatRoom.objects.annotate(msg_count=Count('messages')).filter(msg_count__gt=0).select_related('customer')
         data = []
         for r in rooms:
             unread_count = r.messages.filter(sender_is_admin=False, is_read=False).count()
             data.append({
                 "room_id": r.id,
-                "customer_name": r.customer.nama_customer or r.customer.user.first_name if r.customer.user else "Customer",
+                "customer_name": r.customer.nama_customer or (r.customer.user.first_name if r.customer.user else "Customer"),
                 "unread_count": unread_count,
                 "last_updated": r.updated_at
             })
         return Response(data)
 
 class DashboardChatMessagesAPIView(APIView):
+    permission_classes = [IsAdminUser]
     """GET/POST /api/dashboard/chat/rooms/<id>/messages/"""
-    from rest_framework.permissions import AllowAny
-    authentication_classes = []
-    permission_classes = [AllowAny]
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
     def get(self, request, room_id):
         from .models import ChatRoom
@@ -838,7 +900,7 @@ class DashboardChatMessagesAPIView(APIView):
                     "kode_hamster": inv.kode_hamster,
                     "varian": str(inv.variant),
                     "harga": inv.harga_display,
-                    "foto_preview": request.build_absolute_uri(inv.foto_preview.url) if inv.foto_preview else None,
+                    "foto_preview": (inv.foto_preview.name if str(inv.foto_preview.name).startswith("http") else request.build_absolute_uri(inv.foto_preview.url)) if inv.foto_preview else None,
                 }
             
             data.append({
@@ -847,6 +909,8 @@ class DashboardChatMessagesAPIView(APIView):
                 "sender_is_admin": m.sender_is_admin,
                 "is_read": m.is_read,
                 "related_inventory": inv_data,
+                "media_url": m.media_url,
+                "media_type": m.media_type,
                 "created_at": m.created_at
             })
 
@@ -856,9 +920,10 @@ class DashboardChatMessagesAPIView(APIView):
         from .models import ChatRoom, ChatMessage
         message_text = request.data.get("message", "").strip()
         inventory_id = request.data.get("inventory_id")
+        media_url = request.data.get("media_url", "")
         
-        if not message_text and not inventory_id:
-            return Response({"error": "Pesan tidak boleh kosong."}, status=400)
+        if not message_text and not inventory_id and not media_url:
+            return Response({"error": "Pesan atau file tidak boleh kosong."}, status=400)
             
         try:
             room = ChatRoom.objects.get(pk=room_id)
@@ -874,7 +939,9 @@ class DashboardChatMessagesAPIView(APIView):
             room=room,
             sender_is_admin=True,  # Always true for admin dashboard
             message=message_text,
-            related_inventory=related_inv
+            related_inventory=related_inv,
+            media_url=request.data.get("media_url", ""),
+            media_type=request.data.get("media_type", "")
         )
         
         room.updated_at = msg.created_at
@@ -885,16 +952,37 @@ class DashboardChatMessagesAPIView(APIView):
             "message": msg.message,
             "sender_is_admin": msg.sender_is_admin,
             "is_read": msg.is_read,
+            "media_url": msg.media_url,
+            "media_type": msg.media_type,
             "created_at": msg.created_at
         }, status=201)
 
 
-    def delete(self, request, item_id):
-        from .models import LiveInventory
-        try:
-            item = LiveInventory.objects.get(pk=item_id)
-        except LiveInventory.DoesNotExist:
-            return Response({"error": "Item tidak ditemukan."}, status=404)
+class DashboardTransactionSendChatAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    """POST /api/dashboard/transactions/<pk>/send_chat/ — Send automated chat to transaction's customer."""
+    from rest_framework.permissions import IsAdminUser
+    permission_classes = [IsAdminUser]
 
-        item.delete()
-        return Response({"success": True}, status=200)
+    def post(self, request, pk):
+        from .models import Transaction, ChatRoom, ChatMessage
+        try:
+            trx = Transaction.objects.get(pk=pk)
+        except Transaction.DoesNotExist:
+            return Response({"error": "Transaksi tidak ditemukan"}, status=404)
+            
+        message_text = request.data.get("message", "").strip()
+        if not message_text:
+            return Response({"error": "Pesan kosong"}, status=400)
+            
+        if trx.customer:
+            room, _ = ChatRoom.objects.get_or_create(customer=trx.customer)
+            ChatMessage.objects.create(
+                room=room,
+                message=message_text,
+                sender_is_admin=True,
+                is_read=False
+            )
+            return Response({"success": True})
+        return Response({"error": "Transaksi ini tidak memiliki profil customer yang valid."}, status=400)
+

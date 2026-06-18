@@ -70,9 +70,9 @@ class AddressAdmin(admin.ModelAdmin):
 
 @admin.register(MasterVariant)
 class MasterVariantAdmin(admin.ModelAdmin):
-    list_display = ["variant_id", "spesies", "varian_warna", "jenis_bulu", "is_satin"]
-    list_filter = ["spesies", "jenis_bulu", "is_satin"]
-    search_fields = ["spesies", "varian_warna", "jenis_bulu"]
+    list_display = ["variant_id", "spesies", "varian_warna"]
+    list_filter = ["spesies"]
+    search_fields = ["spesies", "varian_warna"]
     ordering = ["spesies", "varian_warna"]
 
 
@@ -120,6 +120,9 @@ class SetupSessionAdmin(admin.ModelAdmin):
                     session=new_session,
                     nama_box=box.nama_box,
                     kategori=box.kategori,
+                    spesies=box.spesies,
+                    kategori_box=box.kategori_box,
+                    jenis_kelamin_box=box.jenis_kelamin_box,
                     urutan=box.urutan,
                 )
                 for item in box.items.exclude(status_ketersediaan="Terjual"):
@@ -162,11 +165,11 @@ class BoxAdmin(admin.ModelAdmin):
 class LiveInventoryAdmin(admin.ModelAdmin):
     list_display = [
         "inventory_id", "kode_hamster", "variant", "box",
-        "jenis_kelamin", "usia_bulan", "grade_corak",
+        "jenis_kelamin", "jenis_bulu", "is_satin", "usia_bulan", "grade_corak",
         "harga_display_formatted", "status_ketersediaan",
     ]
     list_filter = [
-        "status_ketersediaan", "jenis_kelamin",
+        "status_ketersediaan", "jenis_kelamin", "jenis_bulu", "is_satin",
         "variant__spesies", "variant__varian_warna", "grade_corak",
         "box__session",
     ]
@@ -180,7 +183,7 @@ class LiveInventoryAdmin(admin.ModelAdmin):
             "fields": ["kode_hamster", "box", "variant"],
         }),
         ("📋 Detail Individu", {
-            "fields": ["jenis_kelamin", "usia_bulan", "grade_corak", "kondisi_fisik"],
+            "fields": ["jenis_kelamin", "jenis_bulu", "is_satin", "usia_bulan", "grade_corak", "kondisi_fisik"],
         }),
         ("📸 Media", {
             "fields": ["foto_preview", "video_file", "preview_foto"],

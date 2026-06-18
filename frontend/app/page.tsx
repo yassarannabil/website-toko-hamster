@@ -72,7 +72,7 @@ export default function GatewayPage() {
               className="group flex flex-col items-center gap-3 rounded-2xl bg-white px-6 py-7 text-brand-900 shadow-xl shadow-brand-900/10 transition-all duration-200 hover:bg-white/95 hover:shadow-2xl hover:shadow-brand-900/20 hover:-translate-y-1 active:scale-[0.97]"
             >
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 shadow-inner overflow-hidden">
-                <span className="text-2xl">🛒</span>
+                <span className="text-2xl"></span>
               </div>
               <div className="text-center">
                 <span className="block text-base font-bold text-gray-900">Keranjang Belanja</span>
@@ -86,7 +86,7 @@ export default function GatewayPage() {
               className="group flex flex-col items-center gap-3 rounded-2xl bg-wa-green/90 px-6 py-7 text-white shadow-lg shadow-wa-green/30 backdrop-blur-sm transition-all duration-200 hover:bg-wa-green hover:shadow-xl hover:shadow-wa-green/40 hover:-translate-y-1 active:scale-[0.97]"
             >
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20">
-                <span className="text-2xl">💬</span>
+                <span className="text-2xl"></span>
               </div>
               <div className="text-center">
                 <span className="block text-base font-bold text-white">Live Chat</span>

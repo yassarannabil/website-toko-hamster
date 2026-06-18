@@ -196,7 +196,7 @@ function InventoryContent() {
       {!selectedSession ? (
         sessions.length === 0 ? (
           <div className="bg-white p-10 sm:p-16 text-center rounded-2xl border border-gray-200 shadow-sm">
-            <span className="text-4xl mb-4 block">📅</span>
+            <span className="text-4xl mb-4 block"></span>
             <p className="text-gray-500 font-medium italic">Belum ada sesi yang terdaftar.</p>
           </div>
         ) : (
@@ -264,7 +264,7 @@ function InventoryContent() {
         <div className="p-8 text-gray-500 font-medium">Memuat katalog box...</div>
       ) : boxes.length === 0 ? (
         <div className="bg-white p-10 sm:p-16 text-center rounded-2xl border border-gray-200 shadow-sm">
-          <span className="text-4xl mb-4 block">📦</span>
+          <span className="text-4xl mb-4 block"></span>
           <p className="text-gray-500 font-medium italic">Belum ada Box di sesi ini.</p>
         </div>
       ) : (

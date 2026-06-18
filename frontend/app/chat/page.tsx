@@ -19,6 +19,8 @@ interface Message {
     harga: number;
     foto_preview: string | null;
   } | null;
+  media_url?: string;
+  media_type?: string;
 }
 
 function formatRupiah(n: number | string): string {
@@ -41,6 +43,9 @@ function ChatContent() {
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
   const prevMessagesLength = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -120,24 +125,56 @@ function ChatContent() {
     fetchMessages();
     const interval = setInterval(() => {
       fetchMessages();
-    }, 3000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [roomId]);
 
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (!cloudName || !uploadPreset) throw new Error("Konfigurasi Cloudinary tidak ditemukan di frontend.");
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", uploadPreset);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+      method: "POST",
+      body: fd
+    });
+    if (!res.ok) {
+      throw new Error(`Cloudinary error: ${res.status}`);
+    }
+    const data = await res.json();
+    return data.secure_url;
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() && !relatedProduct) return;
+    if (!newMessage.trim() && !relatedProduct && !selectedFile) return;
     if (!roomId) return;
 
-    const payload = {
-      message: newMessage,
-      inventory_id: relatedProduct ? relatedProduct.inventory_id : null
-    };
-
-    setNewMessage(""); 
-    setRelatedProduct(null); // Clear context after sending
-
+    setIsUploading(true);
+    let mediaUrl = "";
+    let mediaType = "";
+    
     try {
+      if (selectedFile) {
+        mediaUrl = await uploadToCloudinary(selectedFile);
+        mediaType = selectedFile.type.startsWith("video") ? "video" : "image";
+      }
+
+      const payload = {
+        message: newMessage,
+        inventory_id: relatedProduct ? relatedProduct.inventory_id : null,
+        media_url: mediaUrl,
+        media_type: mediaType
+      };
+
+      setNewMessage(""); 
+      setRelatedProduct(null); // Clear context after sending
+      setSelectedFile(null);
+
       const res = await fetch(`${API_BASE_URL}/api/chat/rooms/${roomId}/messages/`, {
         method: "POST",
         headers: {
@@ -153,7 +190,10 @@ function ChatContent() {
         router.replace("/chat", { scroll: false });
       }
     } catch (err) {
-      alert("Gagal mengirim pesan.");
+      alert("Gagal mengirim pesan atau mengunggah file.");
+      console.error(err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -195,7 +235,7 @@ function ChatContent() {
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-400">
-            <span className="text-4xl mb-3">💬</span>
+            <span className="text-4xl mb-3"></span>
             <p>Mulai obrolan dengan admin.</p>
           </div>
         ) : (
@@ -208,6 +248,16 @@ function ChatContent() {
                     {renderProductCard(msg.related_inventory)}
                   </div>
                 )}
+                {/* Media Attachment */}
+                {msg.media_url && (
+                  <div className={`mb-1 ${msg.sender_is_admin ? "self-start" : "self-end"} overflow-hidden rounded-xl shadow-sm border border-gray-100 max-w-[200px] sm:max-w-[250px]`}>
+                    {msg.media_type === "video" ? (
+                      <video controls src={msg.media_url} className="w-full h-auto object-cover max-h-[300px]" />
+                    ) : (
+                      <img src={msg.media_url} alt="Attachment" className="w-full h-auto object-cover max-h-[300px]" />
+                    )}
+                  </div>
+                )}
                 
                 {/* Text Bubble */}
                 {msg.message && (
@@ -216,10 +266,15 @@ function ChatContent() {
                       ? "bg-white text-gray-800 rounded-tl-none border border-gray-100 self-start" 
                       : "bg-[#ea8b3a] text-white rounded-tr-none self-end"
                   }`}>
-                    <p className="whitespace-pre-wrap">{msg.message}</p>
+                    <p className="whitespace-pre-wrap break-words">{msg.message}</p>
                     <div className={`text-[10px] mt-1.5 text-right ${msg.sender_is_admin ? "text-gray-400" : "text-white/80"}`}>
                       {new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                     </div>
+                  </div>
+                )}
+                {!msg.message && msg.media_url && (
+                  <div className={`text-[10px] mt-1 text-right ${msg.sender_is_admin ? "text-gray-400" : "text-gray-400"}`}>
+                    {new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 )}
               </div>
@@ -247,8 +302,40 @@ function ChatContent() {
               {renderProductCard(relatedProduct)}
             </div>
           )}
+          {/* File Preview */}
+          {selectedFile && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-lg max-w-xs relative">
+              <span className="text-xs truncate">{selectedFile.name}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedFile(null)}
+                className="text-red-500 font-bold ml-auto px-2 hover:bg-gray-200 rounded"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-end">
+            <input 
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setSelectedFile(e.target.files[0]);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-12 h-12 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-600 transition-colors flex-shrink-0"
+              title="Lampirkan File"
+            >
+              📎
+            </button>
             <input
               type="text"
               value={newMessage}
@@ -258,8 +345,8 @@ function ChatContent() {
             />
             <button 
               type="submit"
-              disabled={!newMessage.trim() && !relatedProduct}
-              className="w-12 h-12 bg-[#ea8b3a] hover:bg-[#dc7030] rounded-full flex items-center justify-center text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              disabled={(!newMessage.trim() && !relatedProduct && !selectedFile) || isUploading}
+              className={`w-12 h-12 rounded-full flex items-center justify-center text-white transition-colors flex-shrink-0 ${isUploading ? 'bg-gray-400 cursor-wait' : 'bg-[#ea8b3a] hover:bg-[#dc7030] disabled:opacity-50 disabled:cursor-not-allowed'}`}
             >
               <svg className="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />

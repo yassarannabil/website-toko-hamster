@@ -14,7 +14,8 @@ from .api_dashboard import (
     DashboardBoxesBySessionAPIView, DashboardSessionDetailAPIView,
     DashboardSessionDuplicateAPIView, DashboardBoxDetailAPIView,
     DashboardItemDetailAPIView, DashboardBoxItemsAPIView,
-    DashboardChatRoomsAPIView, DashboardChatMessagesAPIView
+    DashboardChatRoomsAPIView, DashboardChatMessagesAPIView,
+    DashboardTransactionSendChatAPIView
 )
 from .api_ongkir import (
     OngkirProvincesAPIView, 
@@ -23,6 +24,7 @@ from .api_ongkir import (
     OngkirSubdistrictsAPIView,
     OngkirCalculateAPIView
 )
+from . import api_finance
 from .api_auth import RegisterAPIView, LoginAPIView, ProfileAPIView, CustomerAddressAPIView, CustomerTransactionsAPIView
 from .api_store import CartAPIView, CheckoutAPIView, InventoryDetailAPIView
 from .api_payment import DokuNotificationAPIView
@@ -76,11 +78,18 @@ urlpatterns = [
     path("dashboard/invoice/", DashboardCreateInvoiceAPIView.as_view(), name="api_dashboard_invoice"),
     path("dashboard/transactions/", DashboardTransactionAPIView.as_view(), name="api_dashboard_transactions"),
     path("dashboard/transactions/<int:pk>/", DashboardTransactionDetailAPIView.as_view(), name="api_dashboard_transaction_detail"),
+    path("dashboard/transactions/<int:pk>/send_chat/", DashboardTransactionSendChatAPIView.as_view(), name="api_dashboard_transaction_send_chat"),
     path("dashboard/variants/", DashboardVariantsAPIView.as_view(), name="api_dashboard_variants"),
     path("dashboard/inventory/add/", DashboardAddInventoryAPIView.as_view(), name="api_dashboard_inventory_add"),
     path("dashboard/inventory/<int:pk>/upload/", DashboardUploadMediaAPIView.as_view(), name="api_dashboard_inventory_upload"),
     path("dashboard/chat/rooms/", DashboardChatRoomsAPIView.as_view(), name="api_dashboard_chat_rooms"),
-    path("dashboard/chat/rooms/<int:room_id>/messages/", DashboardChatMessagesAPIView.as_view(), name="api_dashboard_chat_messages"),
+    path('dashboard/chat/rooms/<int:room_id>/messages/', DashboardChatMessagesAPIView.as_view(), name='dashboard-chat-messages'),
+
+    # Keuangan (Finance)
+    path('dashboard/finance/summary/', api_finance.FinanceSummaryAPIView.as_view(), name='dashboard-finance-summary'),
+    path('dashboard/finance/chart/', api_finance.FinanceChartAPIView.as_view(), name='dashboard-finance-chart'),
+    path('dashboard/finance/expenses/', api_finance.ExpenseAPIView.as_view(), name='dashboard-finance-expenses'),
+
 
     # ----------------------------------------------------
     # Public API (Cek Ongkir — BinderByte)

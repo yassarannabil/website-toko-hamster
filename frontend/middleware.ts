@@ -8,7 +8,19 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     const normalizedPath = pathname.endsWith('/') ? pathname : pathname + '/';
     const djangoUrl = `http://127.0.0.1:8000${normalizedPath}${search}`;
-    return NextResponse.rewrite(new URL(djangoUrl));
+    
+    const requestHeaders = new Headers(request.headers);
+    const token = request.cookies.get('noska_admin_token')?.value;
+    
+    if (token && pathname.startsWith('/api/dashboard')) {
+      requestHeaders.set('Authorization', `Token ${token}`);
+    }
+    
+    return NextResponse.rewrite(new URL(djangoUrl), {
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // 2. Dashboard Protection

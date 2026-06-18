@@ -45,8 +45,8 @@ class LiveInventorySerializer(serializers.ModelSerializer):
     # Flatten dari relasi variant → MasterVariant
     spesies = serializers.CharField(source="variant.spesies", read_only=True)
     varian_warna = serializers.CharField(source="variant.varian_warna", read_only=True)
-    jenis_bulu = serializers.CharField(source="variant.jenis_bulu", read_only=True)
-    is_satin = serializers.BooleanField(source="variant.is_satin", read_only=True)
+    jenis_bulu = serializers.CharField(read_only=True)
+    is_satin = serializers.BooleanField(read_only=True)
 
     # Gabungan untuk display: "Syrian Golden Long Hair Satin"
     varian = serializers.SerializerMethodField()
@@ -96,9 +96,9 @@ class LiveInventorySerializer(serializers.ModelSerializer):
             return f"Perlengkapan - {obj.variant.varian_warna}"
 
         parts = [obj.variant.varian_warna]
-        if obj.variant.is_satin:
+        if obj.is_satin:
             parts.append("Satin")
-        bulu = self.BULU_ABBR.get(obj.variant.jenis_bulu, obj.variant.jenis_bulu)
+        bulu = self.BULU_ABBR.get(obj.jenis_bulu, obj.jenis_bulu)
         if bulu and bulu != "Tidak Ada (Aksesoris)":
             parts.append(bulu)
         return f"{obj.variant.spesies} - {' '.join(parts)}"

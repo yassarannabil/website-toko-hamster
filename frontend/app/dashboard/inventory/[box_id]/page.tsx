@@ -42,11 +42,21 @@ export default function BoxInventoryPage() {
   const [formData, setFormData] = useState({
     variant_id: "",
     jenis_kelamin: "Belum Diketahui",
+    jenis_bulu: "Short Hair",
+    is_satin: false,
     usia_bulan: "",
     grade_corak: "",
     harga_display: "",
     kondisi_fisik: "",
   });
+
+  // Variant Add State
+  const [showAddVariant, setShowAddVariant] = useState(false);
+  const [variantForm, setVariantForm] = useState({
+    spesies: "Syrian",
+    varian_warna: "",
+  });
+  const [creatingVariant, setCreatingVariant] = useState(false);
 
   const fetchInventory = async () => {
     try {
@@ -110,6 +120,8 @@ export default function BoxInventoryPage() {
     setFormData({
       variant_id: "",
       jenis_kelamin: "Belum Diketahui",
+      jenis_bulu: "Short Hair",
+      is_satin: false,
       usia_bulan: "",
       grade_corak: "",
       harga_display: "",
@@ -119,7 +131,37 @@ export default function BoxInventoryPage() {
     setFotoFile(null);
     setVideoFile(null);
     setFotoPreviewUrl(null);
+    setShowAddVariant(false);
     setShowModal(true);
+  };
+
+  const handleCreateVariant = async () => {
+    if (!variantForm.varian_warna) return alert("Warna wajib diisi!");
+    setCreatingVariant(true);
+    try {
+      const res = await fetch('/api/dashboard/variants/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(variantForm)
+      });
+      if (res.ok) {
+        const newVar = await res.json();
+        // Update list
+        setVariants(prev => [...prev, newVar].sort((a, b) => a.spesies.localeCompare(b.spesies) || a.varian_warna.localeCompare(b.varian_warna)));
+        // Auto select
+        setFormData(prev => ({ ...prev, variant_id: String(newVar.variant_id) }));
+        // Close form
+        setShowAddVariant(false);
+        setVariantForm({ spesies: "Syrian", varian_warna: "" });
+      } else {
+        const err = await res.json();
+        alert(err.error || "Gagal membuat varian baru");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Terjadi kesalahan jaringan.");
+    }
+    setCreatingVariant(false);
   };
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,6 +269,8 @@ export default function BoxInventoryPage() {
           box_id: Number(boxId),
           variant_id: Number(formData.variant_id),
           jenis_kelamin: formData.jenis_kelamin,
+          jenis_bulu: formData.jenis_bulu,
+          is_satin: formData.is_satin,
           usia_bulan: formData.usia_bulan || null,
           grade_corak: formData.grade_corak || null,
           harga_display: Number(formData.harga_display) || 0,
@@ -255,6 +299,8 @@ export default function BoxInventoryPage() {
         setFormData({
           variant_id: "",
           jenis_kelamin: "Belum Diketahui",
+          jenis_bulu: "Short Hair",
+          is_satin: false,
           usia_bulan: "",
           grade_corak: "",
           harga_display: "",
@@ -321,7 +367,7 @@ export default function BoxInventoryPage() {
 
       {inventory.length === 0 ? (
         <div className="bg-white p-10 sm:p-16 text-center rounded-2xl border border-gray-200 shadow-sm">
-          <span className="text-4xl mb-4 block">🐹</span>
+          <span className="text-4xl mb-4 block"></span>
           <p className="text-gray-500 font-medium italic">Tidak ada hamster di dalam box ini.</p>
           <button
             onClick={openModal}
@@ -389,7 +435,56 @@ export default function BoxInventoryPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               {/* Varian */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Varian Genetik *</label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-sm font-bold text-gray-700">Varian Genetik *</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddVariant(!showAddVariant)}
+                    className="text-xs font-bold text-orange-600 hover:text-orange-700 transition"
+                  >
+                    {showAddVariant ? "- Batal" : "+ Varian Baru"}
+                  </button>
+                </div>
+                
+                {showAddVariant && (
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-3 space-y-3">
+                    <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">Buat Varian Langsung</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-600 mb-1">Spesies</label>
+                        <select 
+                          value={variantForm.spesies} 
+                          onChange={e => setVariantForm({...variantForm, spesies: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-orange-500 outline-none"
+                        >
+                          <option value="Syrian">Syrian</option>
+                          <option value="Campbell">Campbell</option>
+                          <option value="Winter White">Winter White</option>
+                          <option value="Roborovski">Roborovski</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-600 mb-1">Warna / Corak</label>
+                        <input 
+                          type="text" 
+                          placeholder="Cth: Black Banded" 
+                          value={variantForm.varian_warna}
+                          onChange={e => setVariantForm({...variantForm, varian_warna: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-orange-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={handleCreateVariant}
+                      disabled={creatingVariant}
+                      className="w-full bg-orange-600 text-white py-1.5 rounded-lg text-sm font-bold hover:bg-orange-700 transition"
+                    >
+                      {creatingVariant ? "Menyimpan..." : "Simpan & Pilih Varian Ini"}
+                    </button>
+                  </div>
+                )}
+
                 <select
                   required
                   value={formData.variant_id}
@@ -405,18 +500,45 @@ export default function BoxInventoryPage() {
                 </select>
               </div>
 
-              {/* Jenis Kelamin */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Jenis Kelamin</label>
-                <select
-                  value={formData.jenis_kelamin}
-                  onChange={(e) => setFormData({ ...formData, jenis_kelamin: e.target.value })}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-                >
-                  <option value="Jantan">Jantan</option>
-                  <option value="Betina">Betina</option>
-                  <option value="Belum Diketahui">Belum Diketahui</option>
-                </select>
+              {/* Jenis Kelamin & Bulu & Satin */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Jenis Kelamin</label>
+                  <select
+                    value={formData.jenis_kelamin}
+                    onChange={(e) => setFormData({ ...formData, jenis_kelamin: e.target.value })}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  >
+                    <option value="Jantan">Jantan</option>
+                    <option value="Betina">Betina</option>
+                    <option value="Belum Diketahui">Belum Diketahui</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Jenis Bulu</label>
+                  <select
+                    value={formData.jenis_bulu}
+                    onChange={(e) => setFormData({ ...formData, jenis_bulu: e.target.value })}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                  >
+                    <option value="Short Hair">Short Hair</option>
+                    <option value="Medium Hair">Medium Hair</option>
+                    <option value="Long Hair">Long Hair</option>
+                    <option value="Rex">Rex</option>
+                    <option value="Tidak Ada">Tidak Ada (Aksesoris)</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm hover:bg-gray-50 transition">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_satin}
+                      onChange={(e) => setFormData({ ...formData, is_satin: e.target.checked })}
+                      className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-bold text-gray-700">Satin? (Mengkilap)</span>
+                  </label>
+                </div>
               </div>
 
               {/* Row: Usia + Grade */}

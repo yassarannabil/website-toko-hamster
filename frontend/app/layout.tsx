@@ -32,7 +32,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans">
-        <Script src="https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js" strategy="beforeInteractive" />
+        <Script src="https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js" strategy="afterInteractive" />
         <AppLayoutWrapper>{children}</AppLayoutWrapper>
       </body>
     </html>

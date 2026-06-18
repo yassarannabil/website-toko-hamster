@@ -62,7 +62,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm
+        fixed inset-y-0 left-0 z-50 w-max bg-white border-r border-gray-200 flex flex-col shadow-sm
         transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0 md:z-auto
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -75,14 +75,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <Link href="/dashboard" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
             Beranda
           </Link>
+          <Link href="/dashboard/chat" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
+            Chat Pelanggan
+          </Link>
           <Link href="/dashboard/transactions" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
             Daftar Pesanan
           </Link>
           <Link href="/dashboard/inventory" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
             Stok Live
           </Link>
-          <Link href="/dashboard/chat" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
-            Chat Pelanggan
+          <Link href="/dashboard/finance" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-orange-50 hover:text-orange-600 transition-colors">
+            Keuangan & Laba
           </Link>
         </nav>
         <div className="p-4 border-t border-gray-200 space-y-2">

@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="hidden border-t border-brand-100 bg-surface-muted md:block">
       <div className="mx-auto max-w-6xl px-4 py-8 text-center sm:py-10">
         <p className="text-sm font-semibold text-text-secondary">
-          🐹 Noska Hamster
+           Noska Hamster
         </p>
         <p className="mt-1 text-xs text-text-muted">
           Hamster Terbaik · Kualitas Terjamin · Pengiriman Aman

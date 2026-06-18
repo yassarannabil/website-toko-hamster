@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { WHATSAPP_NUMBER } from '../../data/hamsters';
 
 export default function PrintBatchPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -136,7 +137,7 @@ export default function PrintBatchPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2mm', borderBottom: '3px solid #000', paddingBottom: '2mm' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '12px' }}>NOSKA HAMSTER</h3>
-                <div style={{ fontSize: '9px' }}>WA: 0812-3456-7890</div>
+                <div style={{ fontSize: '9px' }}>WA: +{WHATSAPP_NUMBER}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '900', textTransform: 'uppercase' }}>

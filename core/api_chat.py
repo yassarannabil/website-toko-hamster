@@ -15,9 +15,10 @@ class ChatRoomAPIView(APIView):
 
     def get(self, request):
         user = request.user
-        # Jika Admin/Staff, ambil semua room
+        # Jika Admin/Staff, ambil semua room yang memiliki pesan
         if user.is_staff:
-            rooms = ChatRoom.objects.all().select_related('customer')
+            from django.db.models import Count
+            rooms = ChatRoom.objects.annotate(msg_count=Count('messages')).filter(msg_count__gt=0).select_related('customer')
             data = []
             for r in rooms:
                 unread_count = r.messages.filter(sender_is_admin=False, is_read=False).count()
@@ -78,12 +79,13 @@ class ChatMessageAPIView(APIView):
                     "kode_hamster": inv.kode_hamster,
                     "varian": str(inv.variant),
                     "harga": inv.harga_display,
-                    "foto_preview": request.build_absolute_uri(inv.foto_preview.url) if inv.foto_preview else None,
+                    "foto_preview": (inv.foto_preview.name if str(inv.foto_preview.name).startswith("http") else request.build_absolute_uri(inv.foto_preview.url)) if inv.foto_preview else None,
                 }
-            
             data.append({
                 "id": m.id,
                 "message": m.message,
+                "media_url": m.media_url,
+                "media_type": m.media_type,
                 "sender_is_admin": m.sender_is_admin,
                 "is_read": m.is_read,
                 "related_inventory": inv_data,
@@ -96,8 +98,10 @@ class ChatMessageAPIView(APIView):
         user = request.user
         message_text = request.data.get("message", "").strip()
         inventory_id = request.data.get("inventory_id")
+        media_url = request.data.get("media_url")
+        media_type = request.data.get("media_type")
         
-        if not message_text and not inventory_id:
+        if not message_text and not inventory_id and not media_url:
             return Response({"error": "Pesan tidak boleh kosong."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
@@ -121,6 +125,8 @@ class ChatMessageAPIView(APIView):
             room=room,
             sender_is_admin=user.is_staff,
             message=message_text,
+            media_url=media_url,
+            media_type=media_type,
             related_inventory=related_inv
         )
         
@@ -135,12 +141,14 @@ class ChatMessageAPIView(APIView):
                 "kode_hamster": inv.kode_hamster,
                 "varian": str(inv.variant),
                 "harga": inv.harga_display,
-                "foto_preview": request.build_absolute_uri(inv.foto_preview.url) if inv.foto_preview else None,
+                "foto_preview": (inv.foto_preview.name if str(inv.foto_preview.name).startswith("http") else request.build_absolute_uri(inv.foto_preview.url)) if inv.foto_preview else None,
             }
 
         return Response({
             "id": msg.id,
             "message": msg.message,
+            "media_url": msg.media_url,
+            "media_type": msg.media_type,
             "sender_is_admin": msg.sender_is_admin,
             "is_read": msg.is_read,
             "related_inventory": inv_data,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { API_BASE_URL } from "../../data/hamsters";
+
 import HamsterImage from "../../components/HamsterImage";
 import Link from "next/link";
 
@@ -26,6 +26,8 @@ interface Message {
     harga: number;
     foto_preview: string | null;
   } | null;
+  media_url?: string;
+  media_type?: string;
 }
 
 function formatRupiah(n: number | string): string {
@@ -42,6 +44,10 @@ export default function AdminChatDashboard() {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -53,7 +59,7 @@ export default function AdminChatDashboard() {
   // Fetch Rooms
   const fetchRooms = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/dashboard/chat/rooms/`);
+      const res = await fetch(`/api/dashboard/chat/rooms/`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -69,7 +75,7 @@ export default function AdminChatDashboard() {
   const fetchMessages = async () => {
     if (!activeRoom) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/dashboard/chat/rooms/${activeRoom.room_id}/messages/`);
+      const res = await fetch(`/api/dashboard/chat/rooms/${activeRoom.room_id}/messages/`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
@@ -84,30 +90,68 @@ export default function AdminChatDashboard() {
     const interval = setInterval(() => {
       fetchRooms();
       fetchMessages();
-    }, 3000); // Polling setiap 3 detik
+    }, 10000); // Polling setiap 10 detik
     return () => clearInterval(interval);
   }, [activeRoom]);
 
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (!cloudName || !uploadPreset) throw new Error("Konfigurasi Cloudinary tidak ditemukan di frontend.");
+
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", uploadPreset);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+      method: "POST",
+      body: fd
+    });
+    if (!res.ok) {
+      throw new Error(`Cloudinary error: ${res.status}`);
+    }
+    const data = await res.json();
+    return data.secure_url;
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeRoom) return;
+    if ((!newMessage.trim() && !selectedFile) || !activeRoom) return;
 
-    const msgToSend = newMessage;
-    setNewMessage("");
-
+    setIsUploading(true);
+    let mediaUrl = "";
+    let mediaType = "";
+    
     try {
-      const res = await fetch(`${API_BASE_URL}/api/dashboard/chat/rooms/${activeRoom.room_id}/messages/`, {
+      if (selectedFile) {
+        mediaUrl = await uploadToCloudinary(selectedFile);
+        mediaType = selectedFile.type.startsWith("video") ? "video" : "image";
+      }
+
+      const payload = {
+        message: newMessage,
+        media_url: mediaUrl,
+        media_type: mediaType
+      };
+
+      setNewMessage("");
+      setSelectedFile(null);
+
+      const res = await fetch(`/api/dashboard/chat/rooms/${activeRoom.room_id}/messages/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message: msgToSend })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         fetchMessages();
         fetchRooms();
       }
-    } catch (err) {}
+    } catch (err) {
+      alert("Gagal mengirim pesan atau mengunggah file.");
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const renderProductCard = (inv: any) => (
@@ -201,6 +245,17 @@ export default function AdminChatDashboard() {
                       </div>
                     )}
                     
+                    {/* Media Attachment */}
+                    {msg.media_url && (
+                      <div className={`mb-1 ${msg.sender_is_admin ? "self-end" : "self-start"} overflow-hidden rounded-xl shadow-sm border border-gray-100 max-w-[200px] sm:max-w-[250px]`}>
+                        {msg.media_type === "video" ? (
+                          <video controls src={msg.media_url} className="w-full h-auto object-cover max-h-[300px]" />
+                        ) : (
+                          <img src={msg.media_url} alt="Attachment" className="w-full h-auto object-cover max-h-[300px]" />
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Text Bubble */}
                     {msg.message && (
                       <div 
@@ -210,10 +265,15 @@ export default function AdminChatDashboard() {
                             : "bg-white text-gray-800 rounded-tl-none border border-gray-100 self-start"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.message}</p>
+                        <p className="whitespace-pre-wrap break-words">{msg.message}</p>
                         <div className={`text-[10px] mt-1 text-right ${msg.sender_is_admin ? "text-orange-100" : "text-gray-400"}`}>
                           {new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                         </div>
+                      </div>
+                    )}
+                    {!msg.message && msg.media_url && (
+                      <div className={`text-[10px] mt-1 text-right ${msg.sender_is_admin ? "text-gray-400" : "text-gray-400"}`}>
+                        {new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     )}
                   </div>
@@ -222,28 +282,60 @@ export default function AdminChatDashboard() {
               <div ref={messagesEndRef} />
             </div>
             
-            <footer className="bg-white p-4 border-t border-gray-100">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
+            <div className="bg-white p-4 border-t border-gray-100 flex flex-col">
+              {/* File Preview */}
+              {selectedFile && (
+                <div className="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-lg max-w-xs relative self-start">
+                  <span className="text-xs truncate">{selectedFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="text-red-500 font-bold ml-auto px-2 hover:bg-gray-200 rounded"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                <input 
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-12 h-12 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-600 transition-colors flex-shrink-0"
+                  title="Lampirkan File"
+                >
+                  📎
+                </button>
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Ketik balasan untuk pelanggan..."
-                  className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ea8b3a]/30"
+                  className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ea8b3a]/30 h-12"
                 />
                 <button 
                   type="submit"
-                  disabled={!newMessage.trim()}
-                  className="px-6 py-3 bg-[#ea8b3a] text-white font-bold rounded-xl hover:bg-[#dc7030] disabled:opacity-50"
+                  disabled={(!newMessage.trim() && !selectedFile) || isUploading}
+                  className={`px-6 h-12 text-white font-bold rounded-xl transition-colors flex-shrink-0 ${isUploading ? 'bg-gray-400 cursor-wait' : 'bg-[#ea8b3a] hover:bg-[#dc7030] disabled:opacity-50'}`}
                 >
-                  Kirim
+                  {isUploading ? 'Mengirim...' : 'Kirim'}
                 </button>
               </form>
-            </footer>
+            </div>
           </>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-gray-400">
-            <span className="text-5xl mb-4">📨</span>
+            <span className="text-5xl mb-4"></span>
             <p className="text-lg">Pilih pesan di samping untuk membalas pelanggan.</p>
           </div>
         )}

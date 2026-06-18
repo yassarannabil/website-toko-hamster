@@ -45,7 +45,7 @@ export interface PaginatedResponse<T> {
 
 export const WHATSAPP_NUMBER = "6281230134185";
 
-export const API_BASE_URL = "http://127.0.0.1:8000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 /**
  * Ensures media URLs fetched via Server Components (which come with 127.0.0.1 domain)
