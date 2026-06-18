@@ -27,9 +27,16 @@ export default function DashboardHome() {
   useEffect(() => {
     async function fetchData() {
       try {
+        const token = localStorage.getItem('token');
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        
         const [statsRes, financeRes] = await Promise.all([
-          fetch('/api/dashboard/stats/'),
-          fetch('/api/dashboard/finance/summary/?days=30')
+          fetch(`${baseUrl}/api/dashboard/stats/`, {
+            headers: { 'Authorization': `Token ${token}` }
+          }),
+          fetch(`${baseUrl}/api/dashboard/finance/summary/?days=30`, {
+            headers: { 'Authorization': `Token ${token}` }
+          })
         ]);
         
         if (statsRes.ok) setStats(await statsRes.json());
