@@ -33,40 +33,23 @@ class DokuNotificationAPIView(APIView):
         secret_key = settings.DOKU_SECRET_KEY
         
         raw_body = request.body
-        digest_raw = base64.b64encode(hashlib.sha256(raw_body).digest()).decode('utf-8')
+        digest = base64.b64encode(hashlib.sha256(raw_body).digest()).decode('utf-8')
         
-        components_raw = (
+        components = (
             f"Client-Id:{client_id}\n"
             f"Request-Id:{request_id}\n"
             f"Request-Timestamp:{request_timestamp}\n"
             f"Request-Target:{target_path}\n"
-            f"Digest:{digest_raw}"
+            f"Digest:{digest}"
         )
-        expected_signature_raw = "HMACSHA256=" + base64.b64encode(hmac.new(secret_key.encode('utf-8'), components_raw.encode('utf-8'), hashlib.sha256).digest()).decode('utf-8')
         
-        # Test Minified Body as well
-        body_minified = json.dumps(request.data, separators=(',', ':'))
-        digest_minified = base64.b64encode(hashlib.sha256(body_minified.encode('utf-8')).digest()).decode('utf-8')
-        components_minified = (
-            f"Client-Id:{client_id}\n"
-            f"Request-Id:{request_id}\n"
-            f"Request-Timestamp:{request_timestamp}\n"
-            f"Request-Target:{target_path}\n"
-            f"Digest:{digest_minified}"
-        )
-        expected_signature_min = "HMACSHA256=" + base64.b64encode(hmac.new(secret_key.encode('utf-8'), components_minified.encode('utf-8'), hashlib.sha256).digest()).decode('utf-8')
-
-        print(f"--- DOKU WEBHOOK DEBUG ---", flush=True)
-        print(f"Headers Signature: {signature_header}", flush=True)
-        print(f"Expected Raw: {expected_signature_raw}", flush=True)
-        print(f"Expected Minified: {expected_signature_min}", flush=True)
-        print(f"Target Path: {target_path}", flush=True)
-        print(f"Raw Body: {raw_body}", flush=True)
-        print(f"Minified Body: {body_minified}", flush=True)
-        print(f"--------------------------", flush=True)
+        expected_signature = "HMACSHA256=" + base64.b64encode(hmac.new(
+            secret_key.encode('utf-8'), 
+            components.encode('utf-8'), 
+            hashlib.sha256
+        ).digest()).decode('utf-8')
         
-        if hmac.compare_digest(expected_signature_raw, signature_header) or hmac.compare_digest(expected_signature_min, signature_header):
-            print("Signature matches!", flush=True)
+        if hmac.compare_digest(expected_signature, signature_header):
             # Proceed with processing
             try:
                 transaction_status = request.data.get('transaction', {}).get('status', '').upper()
