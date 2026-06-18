@@ -4,24 +4,7 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  // 1. Proxy /api/* requests to Django backend
-  if (pathname.startsWith('/api/')) {
-    const normalizedPath = pathname.endsWith('/') ? pathname : pathname + '/';
-    const djangoUrl = `http://127.0.0.1:8000${normalizedPath}${search}`;
-    
-    const requestHeaders = new Headers(request.headers);
-    const token = request.cookies.get('noska_admin_token')?.value;
-    
-    if (token && pathname.startsWith('/api/dashboard')) {
-      requestHeaders.set('Authorization', `Token ${token}`);
-    }
-    
-    return NextResponse.rewrite(new URL(djangoUrl), {
-      request: {
-        headers: requestHeaders,
-      },
-    });
-  }
+  // 1. (Dihapus) Rute /api/ tidak lagi ditangani oleh middleware, melainkan langsung oleh Nginx
 
   // 2. Dashboard Protection
   if (pathname.startsWith('/dashboard')) {
