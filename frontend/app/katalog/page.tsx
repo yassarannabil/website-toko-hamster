@@ -9,10 +9,14 @@ async function getBoxes(): Promise<BoxItem[]> {
     const res = await fetch(`${API_BASE_URL}/api/boxes/`, {
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("fetch failed with status:", res.status);
+      return [];
+    }
     const data: PaginatedResponse<BoxItem> = await res.json();
     return data.results;
-  } catch {
+  } catch (error) {
+    console.error("fetch error:", error);
     return [];
   }
 }
